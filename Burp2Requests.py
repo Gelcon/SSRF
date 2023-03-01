@@ -3,19 +3,26 @@
 
 """
 本文件功能：
-处理Burpsuite格式的请求
-
+处理BurpSuite格式的请求
 """
 
+
 class SSRFRequests(object):
-    # 将BurpSuite格式的请求转换为
-    def httpraw(self, raw: str, **kwargs):
-        raw = raw.strip()
+
+    def __init__(self, raw: str):
+        self.raw = raw
+        self.request_info = None
+        # 处理raw，将其解析得到请求信息
+        self.get_request_info()
+
+    # 将BurpSuite格式的请求转换为字典等信息
+    def get_request_info(self, **kwargs):
+        raw = self.raw.strip()
         # Key值不存在则返回None
-        proxy = kwargs.get("proxy", None)
+        # proxy = kwargs.get("proxy", None)
         real_host = kwargs.get("real_host", None)
         ssl = kwargs.get("ssl", False)
-        location = kwargs.get("location", True)
+        # location = kwargs.get("location", True)
 
         scheme = 'http'
         port = 80
@@ -28,7 +35,7 @@ class SSRFRequests(object):
             index = raw.index('\n')
         except ValueError:
             raise Exception("ValueError")
-        log = {}
+        # log = {}
         try:
             # :index表示到换行为止，也就是第一行按空格分割
             # 得到请求方式，请求路径，协议
@@ -92,6 +99,55 @@ class SSRFRequests(object):
         url_info = scheme, host, int(port), path
         print('url_info:')
         print(url_info)
+        # 封装成RequestInfo对象
+        self.request_info = RequestInfo(headers=headers,
+                                        body=body,
+                                        scheme=scheme,
+                                        port=int(port),
+                                        path=path)
+
+    # 利用get_url_info解析得到的请求信息变异生成Payloads
+    def generate_payload(self):
+        # 生成各种Payloads
+        payloads = GeneratePayloads(self.request_info).payloads()
+
+
+# 封装各种信息
+class RequestInfo:
+    def __init__(self,
+                 headers=None,
+                 body='',
+                 scheme=None,
+                 host=None,
+                 port=None,
+                 path=''):
+        self.headers = headers
+        self.body = body
+        self.scheme = scheme
+        self.host = host
+        self.port = port
+        self.path = path
+
+
+class GeneratePayloads:
+    def __init__(self, request_info: RequestInfo):
+        self.request_info = request_info
+
+    # 生成所有Payloads的主入口
+    def payloads(self):
+        info = self.request_info
+        # http的80或者https的443端口省略不写
+        if info.port == 80 or info.port == 443:
+            _url = "{scheme}://{host}{path}".format(scheme=info.scheme, host=info.host, path=info.path)
+        else:
+            _url = "{scheme}://{host}{path}".format(scheme=info.scheme, host=info.host + ":" + info.port, path=info.path)
+
+
+    # 点分割符号替换
+    # TODO: 需要考虑，如何利用请求信息生成Payloads，直接转换请求没有任何意义
+    def symbol_substitution(self):
+        pass
+
 
 
 if __name__ == '__main__':
@@ -110,4 +166,4 @@ Accept-Language: zh-CN,zh;q=0.9
 Connection: close
 
 {"id":1,"jsonrpc":"2.0","params":{"token":"test"},"method":"web.LoginSTS"}"""
-    SSRFRequests().httpraw(raw=raw_str)
+    SSRFRequests(raw=raw_str)

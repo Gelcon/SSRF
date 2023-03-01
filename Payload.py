@@ -1,5 +1,5 @@
 class Payload:
-    def __init__(self, domain='www.baidu.com', ip='127.0.0.1'):
+    def __init__(self, raw: str, ip='127.0.0.1'):
         self.ip, self.domain = ip, domain
 
     """
