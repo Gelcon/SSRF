@@ -14,6 +14,8 @@ class SSRFRequests(object):
         self.request_info = None
         # 处理raw，将其解析得到请求信息
         self.get_request_info()
+        # 生成Payload
+        self.generate_payload()
 
     # 将BurpSuite格式的请求转换为字典等信息
     def get_request_info(self, **kwargs):
@@ -42,6 +44,7 @@ class SSRFRequests(object):
             method, path, protocol = raw[:index].split(" ")
         except:
             raise Exception("Protocol format error")
+        print('method: {}'.format(method))
         # 除了第一行的其他内容
         raw = raw[index + 1:]
 
@@ -102,14 +105,16 @@ class SSRFRequests(object):
         # 封装成RequestInfo对象
         self.request_info = RequestInfo(headers=headers,
                                         body=body,
+                                        method=method,
                                         scheme=scheme,
+                                        host=host,
                                         port=int(port),
                                         path=path)
 
     # 利用get_url_info解析得到的请求信息变异生成Payloads
     def generate_payload(self):
         # 生成各种Payloads
-        payloads = GeneratePayloads(self.request_info).payloads()
+        payloads = GeneratePayload(self.request_info).payload()
 
 
 # 封装各种信息
@@ -117,31 +122,58 @@ class RequestInfo:
     def __init__(self,
                  headers=None,
                  body='',
+                 method='',
                  scheme=None,
-                 host=None,
-                 port=None,
+                 host='',
+                 port=80,
                  path=''):
         self.headers = headers
         self.body = body
+        self.method = method
         self.scheme = scheme
         self.host = host
         self.port = port
         self.path = path
 
+    def __str__(self):
+        # http的80或者https的443端口省略不写
+        if self.port == 80 or self.port == 443:
+            return "\n以下是RequestInfo的内容：\nheaders:\n{}\nbody:\n{}\nmethod: {}\nURL: {}" \
+                .format(self.headers,
+                        self.body,
+                        self.method,
+                        self.scheme + '://' + self.host + self.path)
+        else:
+            return "\n以下是RequestInfo的内容：\nheaders:\n{}\nbody:\n{}\nmethod: {}\nURL: {}" \
+                .format(self.headers,
+                        self.body,
+                        self.method,
+                        self.scheme + '://' + self.host + ':' + str(self.port) + self.path)
 
-class GeneratePayloads:
+
+class GeneratePayload:
     def __init__(self, request_info: RequestInfo):
         self.request_info = request_info
+        print(request_info)
 
     # 生成所有Payloads的主入口
-    def payloads(self):
+    def payload(self):
         info = self.request_info
         # http的80或者https的443端口省略不写
         if info.port == 80 or info.port == 443:
-            _url = "{scheme}://{host}{path}".format(scheme=info.scheme, host=info.host, path=info.path)
+            url = "{scheme}://{host}{path}".format(scheme=info.scheme,
+                                                   host=info.host,
+                                                   path=info.path)
         else:
-            _url = "{scheme}://{host}{path}".format(scheme=info.scheme, host=info.host + ":" + info.port, path=info.path)
-
+            url = "{scheme}://{host}{path}".format(scheme=info.scheme,
+                                                   host=info.host + ":" + str(info.port),
+                                                   path=info.path)
+        # POST请求，在请求体中进行变异
+        if info.method == 'POST':
+            pass
+        # GET请求，在请求参数值上进行变异
+        else:
+            pass
 
     # 点分割符号替换
     # TODO: 需要考虑，如何利用请求信息生成Payloads，直接转换请求没有任何意义
@@ -149,21 +181,38 @@ class GeneratePayloads:
         pass
 
 
-
 if __name__ == '__main__':
     raw_str = \
-"""POST /minio/webrpc HTTP/1.1
-Host: 139.224.49.113:888
-Content-Length: 74
-x-amz-date: 20221128T032543Z
+        """POST /minio/webrpc HTTP/1.1
+        Host: 139.224.49.113:888
+        Content-Length: 74
+        x-amz-date: 20221128T032543Z
+        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36
+        Content-Type: application/json
+        Accept: */*
+        Origin: http://192.168.32.128:9000
+        Referer: http://192.168.32.128:9000/minio/login
+        Accept-Encoding: gzip, deflate
+        Accept-Language: zh-CN,zh;q=0.9
+        Connection: close
+        
+        {"id":1,"jsonrpc":"2.0","params":{"token":"test"},"method":"web.LoginSTS"}"""
+    SSRFRequests(raw=raw_str)
+
+"""GET /s?ie=UTF-8&wd=test HTTP/1.1
+Host: www.baidu.com
+Sec-Ch-Ua: " Not A;Brand";v="99", "Chromium";v="104"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "Windows"
+Upgrade-Insecure-Requests: 1
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36
-Content-Type: application/json
-Accept: */*
-Origin: http://192.168.32.128:9000
-Referer: http://192.168.32.128:9000/minio/login
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
+Sec-Fetch-Site: none
+Sec-Fetch-Mode: navigate
+Sec-Fetch-User: ?1
+Sec-Fetch-Dest: document
 Accept-Encoding: gzip, deflate
 Accept-Language: zh-CN,zh;q=0.9
 Connection: close
 
-{"id":1,"jsonrpc":"2.0","params":{"token":"test"},"method":"web.LoginSTS"}"""
-    SSRFRequests(raw=raw_str)
+"""
