@@ -6,6 +6,7 @@
 使用方法：
 python ip.py 169.254.169.254 80 www.google.com
 python ip.py 127.0.0.1 80 www.google.com
+提供了向外生成Payload的接口以及生成txt格式的Payload的功能
 """
 
 from __future__ import print_function
