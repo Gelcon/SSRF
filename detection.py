@@ -2,12 +2,12 @@
 # @Date: 2023/2/16 10:13
 
 """
-本文件功能：
-处理BurpSuite格式的请求
+本文件功能：检测SSRF漏洞
 """
+import logging
 
 
-class SSRFRequests(object):
+class SSRFDetection(object):
 
     def __init__(self, raw: str):
         self.raw = raw
@@ -114,7 +114,10 @@ class SSRFRequests(object):
     # 利用get_url_info解析得到的请求信息变异生成Payloads
     def generate_payload(self):
         # 生成各种Payloads
-        payloads = GeneratePayload(self.request_info).payload()
+        payload = Payload(self.request_info).payload()
+        logging.info('生成Payload如下：')
+        for p in payload:
+            logging.info(p)
 
 
 # 封装各种信息
@@ -151,7 +154,7 @@ class RequestInfo:
                         self.scheme + '://' + self.host + ':' + str(self.port) + self.path)
 
 
-class GeneratePayload:
+class Payload:
     def __init__(self, request_info: RequestInfo):
         self.request_info = request_info
         print(request_info)
@@ -160,25 +163,49 @@ class GeneratePayload:
     def payload(self):
         info = self.request_info
         # http的80或者https的443端口省略不写
-        if info.port == 80 or info.port == 443:
-            url = "{scheme}://{host}{path}".format(scheme=info.scheme,
-                                                   host=info.host,
-                                                   path=info.path)
-        else:
-            url = "{scheme}://{host}{path}".format(scheme=info.scheme,
-                                                   host=info.host + ":" + str(info.port),
-                                                   path=info.path)
-        # POST请求，在请求体中进行变异
+        # if info.port == 80 or info.port == 443:
+        #     url = "{scheme}://{host}{path}".format(scheme=info.scheme,
+        #                                            host=info.host,
+        #                                            path=info.path)
+        # else:
+        #     url = "{scheme}://{host}{path}".format(scheme=info.scheme,
+        #                                            host=info.host + ":" + str(info.port),
+        #                                            path=info.path)
+        # 所有的Payload
+        payload = []
+
+        # POST请求，在请求体中进行变异，注意POST请求有三种常见类型，使用Content-Type进行区分
         if info.method == 'POST':
             pass
         # GET请求，在请求参数值上进行变异
-        else:
+        elif info.method == 'GET':
+            # 对请求路径进行分割，得到key为请求参数，val为请求值的字典param_dict
+            param_dict = split_get_str(info.path)
+            for key in param_dict.keys():
+                payload.append(localhost(param_dict, key))
+                # 再次拼接为path
             pass
+        else:
+            logging.error('Unsupported Request Method')
+            pass
+        return payload
 
-    # 点分割符号替换
-    # TODO: 需要考虑，如何利用请求信息生成Payloads，直接转换请求没有任何意义
-    def symbol_substitution(self):
-        pass
+
+# 分割Get请求路径的参数
+def split_get_str(path: str):
+    # 得到?之后的内容，然后按照&分割
+    params = path.split('?')[1].split('&')
+    result = {}
+    for param in params:
+        param = param.split('=')
+        result[param[0]] = params[1]
+    return result
+
+
+# :param_dict GET请求的参数字典
+# :key 参数名
+def localhost(param_dict: dict, key: str):
+    pass
 
 
 if __name__ == '__main__':
@@ -197,7 +224,7 @@ if __name__ == '__main__':
         Connection: close
         
         {"id":1,"jsonrpc":"2.0","params":{"token":"test"},"method":"web.LoginSTS"}"""
-    SSRFRequests(raw=raw_str)
+    SSRFDetection(raw=raw_str)
 
 """GET /s?ie=UTF-8&wd=test HTTP/1.1
 Host: www.baidu.com
