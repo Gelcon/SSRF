@@ -4,7 +4,13 @@
 """
 本文件功能：检测SSRF漏洞
 """
+import copy
+import json
 import logging
+import lxml
+
+from ip import all_payload
+from lxml import etree
 
 
 class SSRFDetection(object):
@@ -162,37 +168,108 @@ class Payload:
     # 生成所有Payloads的主入口
     def payload(self):
         info = self.request_info
-        # http的80或者https的443端口省略不写
-        # if info.port == 80 or info.port == 443:
-        #     url = "{scheme}://{host}{path}".format(scheme=info.scheme,
-        #                                            host=info.host,
-        #                                            path=info.path)
-        # else:
-        #     url = "{scheme}://{host}{path}".format(scheme=info.scheme,
-        #                                            host=info.host + ":" + str(info.port),
-        #                                            path=info.path)
-        # 所有的Payload
+        # 所有payload
         payload = []
 
-        # POST请求，在请求体中进行变异，注意POST请求有三种常见类型，使用Content-Type进行区分
+        # POST请求，在请求体中进行变异，根据Content-Type进行区分
         if info.method == 'POST':
-            pass
+            """
+            json格式：
+            1. 找到所有的key
+            2. 逐个将其val值修改为payload，其余的不变
+            3. 修改info.body
+            4. 将info放入Payload
+            """
+            if info.headers['Content-Type'] and "application/json" in info.headers['Content-Type']:
+                # 将body转换为dict类型
+                json_dict = json.loads(info.body)
+                # 生成访问127.0.0.1的payload
+                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                # 每一个payload，都插入可以作为值的地方
+                for p in temp:
+                    # 返回的是字典类型
+                    result = traverse_json_dict(json_dict, p)
+                    for r in result:
+                        # json.dumps(r)将字典转换为json字符串
+                        info.body = json.dumps(r)
+                        payload.append(info)
+
+            # XML格式
+            elif info.headers['Content-Type'] and "application/xml" in info.headers['Content-Type']:
+                # 将body转换为XML类型
+                tree = etree.XML(info.body)
+                # 生成访问127.0.0.1的payload
+                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                # 每一个payload，都插入可以作为值的地方
+                for p in temp:
+                    result = traverse_xml(tree, p)
+                    for r in result:
+                        # toString方法将_Element对象转换为str
+                        info.body = etree.tostring(r).decode('utf-8')
+                        payload.append(info)
+
+            # 参数格式：key1=value1&key2=value2
+            elif info.headers['Content-Type'] and "application/x-www-form-urlencoded" in info.headers['Content-Type']:
+                param_dict = split_post_urlencoded_str(info.body)
+                # 如果字典为空
+                if not param_dict:
+                    logging.info(f"{info.path} don't have any param to inject.")
+                # 生成访问127.0.0.1的payload
+                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                for p in temp:
+                    for key in param_dict.keys():
+                        # 保存value
+                        val = param_dict[key]
+                        param_dict[key] = p
+                        # 放入请求体
+                        info.body = concat_post_urlencoded_str(param_dict)
+                        # 放入payload列表
+                        payload.append(info)
+                        # 还原value值
+                        param_dict[key] = val
+            else:
+                logging.error('Unsupported Content-Type.')
+
         # GET请求，在请求参数值上进行变异
         elif info.method == 'GET':
+            """
+            GET请求：
+            1. 将?wd=Test&ie=UTF-8切分，生成字典{'wd': 'Test', 'ie': 'UTF-8'}
+            2. 将其替换为{'wd': payload, 'ie': 'UTF-8'}或者{'wd': 'Test', 'ie': payload}
+            3. 转换为?wd=payload&ie=UTF-8和?wd=payload&ie=payload
+            4. 将其放入payload列表
+            """
             # 对请求路径进行分割，得到key为请求参数，val为请求值的字典param_dict
             param_dict = split_get_str(info.path)
-            for key in param_dict.keys():
-                payload.append(localhost(param_dict, key))
-                # 再次拼接为path
-            pass
+            # 如果字典为空
+            if not param_dict:
+                logging.info(f"{info.path} don't have any param to inject.")
+            # 生成访问127.0.0.1的payload
+            temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+            for p in temp:
+                for key in param_dict.keys():
+                    # 保存value
+                    val = param_dict[key]
+                    param_dict[key] = p
+                    # 拼接为path
+                    info.path = concat_get_str(param_dict)
+                    # 放入payload列表
+                    payload.append(info)
+                    # 还原value值
+                    param_dict[key] = val
         else:
             logging.error('Unsupported Request Method')
-            pass
         return payload
 
 
-# 分割Get请求路径的参数
+# 分割GET请求路径的参数
 def split_get_str(path: str):
+    if path.count('?') == 0:
+        return {}
+    # 仅有1个参数
+    if path.count('=') == 1:
+        param = path.split('?')[1].split('=')
+        return {param[0]: param[1]}
     # 得到?之后的内容，然后按照&分割
     params = path.split('?')[1].split('&')
     result = {}
@@ -202,10 +279,137 @@ def split_get_str(path: str):
     return result
 
 
-# :param_dict GET请求的参数字典
-# :key 参数名
-def localhost(param_dict: dict, key: str):
-    pass
+# 合并GET请求路径的参数
+def concat_get_str(param_dict: dict):
+    result = '?'
+    for key in param_dict.keys():
+        result += key + '=' + param_dict[key]
+    return result
+
+
+# 分解格式为key1=value1&key2=value2的post请求参数
+def split_post_urlencoded_str(body: str):
+    # 判断是否为空
+    if body == '':
+        return {}
+    # 仅有1个，例如url=xxx
+    if body.count('=') == 1:
+        temp = body.split('=')
+        return {temp[0]: temp[1]}
+    # 大于1个
+    params = body.split('&')
+    result = {}
+    for param in params:
+        param = param.split('=')
+        result[param[0]] = param[1]
+    return result
+
+
+# 合并格式为key1=value1&key2=value2的post请求参数
+def concat_post_urlencoded_str(param_dict: dict):
+    result = ''
+    for key in param_dict.keys():
+        result += key + '=' + param_dict[key]
+    return result
+
+
+# 遍历json，将payload放置在可能的位置
+def traverse_json_dict(str_dict: dict, payload):
+    # 里面存放字典
+    result = []
+    for key in str_dict:
+        print(f'当前正在处理的key: {key}')
+        """
+        判断当前的str_dict[key]是值还是dict
+        ① 如果是值，直接将其修改为payload，放入result
+        ② 如果是dict，保存当前的val值用于还原，递归调用traverse_json_dict
+        将所有可能的结果都用于修改str_dict[key]，并放入result
+        同时递归调用traverse_dict
+        """
+        # 如果value还是字典
+        if isinstance(str_dict[key], dict):
+            # 递归调用
+            res = traverse_json_dict(str_dict[key], payload)
+            # 保存一份用于还原
+            val = str_dict[key]
+            # 循环设置当前的key依次等于递归调用traverse_json_dict后所有可能的值
+            for r in res:
+                str_dict[key] = r
+                result.append(str_dict.copy())
+            # 还原
+            str_dict[key] = val
+        # value为值
+        else:
+            # 保存一份用于还原
+            val = str_dict[key]
+            str_dict[key] = payload
+            result.append(str_dict.copy())
+            # 还原
+            str_dict[key] = val
+    # 返回所有的可能
+    return result
+
+
+# 遍历xml，将payload放置在可能的位置
+def traverse_xml(root: lxml.etree._Element, payload: str):
+    """
+    遍历xml的每一个结点，步骤如下：
+    判断当前标签是否含有子节点，
+    如果有，则在循环中递归调用traverse_xml
+    如果没有子节点，则将其text设为payload
+    """
+    result = []
+    children = root.getchildren()
+    """
+    xml和json算法的区别在于：
+    xml的大的父标签相当于json中的花括号，没有具体的作用
+    但是在xml中这是标签，而json中直接遍历了除了花括号以外的key
+    """
+    # 如果没有节点了
+    if not root.getchildren():
+        # 但是有text
+        if root.text is not None:
+            # 保存用于还原
+            val = root.text
+            root.text = payload
+            result.append(copy.deepcopy(root))
+            # 还原
+            root.text = val
+        # 直接返回空列表，没有地方可以放置payload，例如<run></run>
+        else:
+            return []
+    # 有子节点
+    else:
+        for child in children:
+            print(f'当前正在处理: \ntag: {child.tag}, text: {child.text}')
+            # 如果有孙结点
+            if child.getchildren():
+                # 对child进行递归
+                res = traverse_xml(child, payload)
+                # 当前的child将其所有的子节点全都删除
+                val = child.getchildren()
+                for grandson in child.getchildren():
+                    child.remove(grandson)
+                for r in res:
+                    # 每一个r都是以和child相同的标签开头，因此child将r的children复制
+                    for grandson in r.getchildren():
+                        child.append(grandson)
+                    # 复制完后，使用深拷贝将当前的root放入result
+                    result.append(copy.deepcopy(root))
+                    # 随后，child将其所有的子元素删除
+                    for grandson in child.getchildren():
+                        child.remove(grandson)
+                # 还原child
+                for v in val:
+                    child.append(v)
+            # 没有其他子节点了
+            else:
+                # 保存用于还原
+                val = child.text
+                child.text = payload
+                result.append(copy.deepcopy(root))
+                child.text = val
+    return result
 
 
 if __name__ == '__main__':
@@ -224,7 +428,7 @@ if __name__ == '__main__':
         Connection: close
         
         {"id":1,"jsonrpc":"2.0","params":{"token":"test"},"method":"web.LoginSTS"}"""
-    SSRFDetection(raw=raw_str)
+    SSRFDetection(raw_str)
 
 """GET /s?ie=UTF-8&wd=test HTTP/1.1
 Host: www.baidu.com
