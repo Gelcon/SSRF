@@ -5,9 +5,12 @@
 本文件功能：检测SSRF漏洞
 """
 import copy
+import datetime
 import json
 import logging
 import lxml
+import requests
+import concurrent.futures
 
 from ip import all_payload
 from lxml import etree
@@ -18,16 +21,18 @@ class SSRFDetection(object):
     def __init__(self, raw: str):
         self.raw = raw
         self.request_info = None
+        self.payload = []
         # 处理raw，将其解析得到请求信息
         self.get_request_info()
-        # 生成Payload
+        # 生成self.payload
         self.generate_payload()
+        self.send_request()
 
     # 将BurpSuite格式的请求转换为字典等信息
     def get_request_info(self, **kwargs):
         raw = self.raw.strip()
         # Key值不存在则返回None
-        # proxy = kwargs.get("proxy", None)
+        proxies = kwargs.get("proxies", None)
         real_host = kwargs.get("real_host", None)
         ssl = kwargs.get("ssl", False)
         # location = kwargs.get("location", True)
@@ -115,16 +120,40 @@ class SSRFDetection(object):
                                         scheme=scheme,
                                         host=host,
                                         port=int(port),
-                                        path=path)
+                                        path=path,
+                                        proxies=proxies)
 
     # 利用get_url_info解析得到的请求信息变异生成Payloads
     def generate_payload(self):
         # 生成各种Payloads
-        payload = Payload(self.request_info).payload()
+        self.payload = Payload(self.request_info).payload()
         logging.info('生成Payload如下：')
-        for p in payload:
+        for p in self.payload:
             logging.info(p)
 
+    # 发送请求
+    def send_request(self):
+        """
+        利用requests库发送请求
+        """
+        info_list = self.payload
+        filename = "request_log_" + "_" + str(datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
+        f = open(filename, 'w')
+        # 并发编程，创建一个具有8个工作线程的线程池
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            # 对info_list中的每一个info都调用fetch_response方法
+            results = executor.map(fetch_response, info_list)
+        for r, info in results:
+            if r.status_code == 200:
+                logging.info(f"当前Payload:\n{str(info)}\n请求成功")
+                # 如果一个类实现了__str__方法
+                # 当我们将类的实例传递给str()方法时，Python会调用__str__方法
+                f.write(f"当前Payload:\n{str(info)}\n请求成功")
+            else:
+                logging.error(f"当前Payload:\n{str(info)}\n请求失败")
+                f.write(f"当前Payload:\n{str(info)}\n请求失败")
+        # 手动关闭
+        f.close()
 
 # 封装各种信息
 class RequestInfo:
@@ -135,7 +164,9 @@ class RequestInfo:
                  scheme=None,
                  host='',
                  port=80,
-                 path=''):
+                 path='',
+                 timeout=3,
+                 proxies=None):
         self.headers = headers
         self.body = body
         self.method = method
@@ -143,6 +174,10 @@ class RequestInfo:
         self.host = host
         self.port = port
         self.path = path
+        # 超时时间，默认是3秒
+        self.timeout = timeout
+        # 代理
+        self.proxies = proxies
 
     def __str__(self):
         # http的80或者https的443端口省略不写
@@ -208,7 +243,7 @@ class Payload:
                         info.body = etree.tostring(r).decode('utf-8')
                         payload.append(info)
 
-            # 参数格式：key1=value1&key2=value2
+            # x-www-form-urlencoded，参数格式：key1=value1&key2=value2
             elif info.headers['Content-Type'] and "application/x-www-form-urlencoded" in info.headers['Content-Type']:
                 param_dict = split_post_urlencoded_str(info.body)
                 # 如果字典为空
@@ -367,17 +402,12 @@ def traverse_xml(root: lxml.etree._Element, payload: str):
     """
     # 如果没有节点了
     if not root.getchildren():
-        # 但是有text
-        if root.text is not None:
-            # 保存用于还原
-            val = root.text
-            root.text = payload
-            result.append(copy.deepcopy(root))
-            # 还原
-            root.text = val
-        # 直接返回空列表，没有地方可以放置payload，例如<run></run>
-        else:
-            return []
+        # 保存用于还原
+        val = root.text
+        root.text = payload
+        result.append(copy.deepcopy(root))
+        # 还原
+        root.text = val
     # 有子节点
     else:
         for child in children:
@@ -410,6 +440,39 @@ def traverse_xml(root: lxml.etree._Element, payload: str):
                 result.append(copy.deepcopy(root))
                 child.text = val
     return result
+
+
+# 发送requests请求
+def fetch_response(info: RequestInfo) -> tuple:
+    # 完整的请求路径
+    full_path = info.scheme + '://' + info.host + ':' + str(info.port) + info.path
+    r = None
+    if info.method == "GET":
+        r = requests.get(full_path,
+                         headers=info.headers,
+                         timeout=info.timeout,
+                         proxies=info.proxies)
+    elif info.method == "POST":
+        if info.headers['Content-Type'] and "application/json" in info.headers['Content-Type']:
+            r = requests.post(full_path,
+                              headers=info.headers,
+                              json=info.body,
+                              timeout=info.timeout,
+                              proxies=info.proxies)
+        elif info.headers['Content-Type'] and "application/xml" in info.headers['Content-Type']:
+            r = requests.post(full_path,
+                              headers=info.headers,
+                              data=info.body,
+                              timeout=info.timeout,
+                              proxies=info.proxies)
+        # "application/x-www-form-urlencoded"
+        else:
+            r = requests.post(full_path,
+                              headers=info.headers,
+                              data=info.body,
+                              timeout=info.timeout,
+                              proxies=info.proxies)
+    return r, info
 
 
 if __name__ == '__main__':

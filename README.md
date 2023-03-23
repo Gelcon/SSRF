@@ -4,25 +4,27 @@
 
 ## Test Environment ##
 
->Centos 7
+>CentOS 7
 >
->Python 3.8
+>Python 3.8.11
 
 ## Tree ##
 
 	SSRF
 	.
 	├── test
-	│   └── Test.py				# 测试功能
+	│   ├── example.py			# 利用Flask框架编写的含有SSRF漏洞的网站
+	│   ├── requestx.txt		# BurpSuite格式的请求案例
+	│   └── test.py				# 测试功能
 	├── tool
-	│   ├── ip.py				# 生成各种形式的ip转换格式
-	│   ├── Burp2Requests.py	# 处理BurpSuite格式的请求
+	│   ├── ip.py				# 生成各种形式的payload，其中all_payload是对外生成payload的方法
+	│   ├── detection.py		# 检测SSRF类型漏洞
 	├── main.py					# 主程序
 
 ## Deploy ##
 
 	脚本放置在任意目录中
-	1）$ python SRF_payload.py 尝试运行并生成关于127.0.0.1的payload
+	1）$ python main.py			# 运行主程序
 
 
 

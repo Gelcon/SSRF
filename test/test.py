@@ -129,65 +129,60 @@ def colored_print():
 from lxml import etree
 
 
-def traverse_xml(root: lxml.etree._Element, payload: str):
-    """
-    遍历xml的每一个结点，步骤如下：
-    判断当前标签是否含有子节点，
-    如果有，则在循环中递归调用traverse_xml
-    如果没有子节点，则将其text设为payload
-    """
-    result = []
-    children = root.getchildren()
-    """
-    xml和json算法的区别在于：
-    xml的大的父标签相当于json中的花括号，没有具体的作用
-    但是在xml中这是标签，而json中直接遍历了除了花括号以外的key
-    """
-    # 如果没有节点了
-    if not root.getchildren():
-        # 但是有text
-        if root.text is not None:
-            # 保存用于还原
-            val = root.text
-            root.text = payload
-            result.append(copy.deepcopy(root))
-            # 还原
-            root.text = val
-        # 直接返回空列表，没有地方可以放置payload，例如<run></run>
-        else:
-            return []
-    # 有子节点
-    else:
-        for child in children:
-            print(f'当前正在处理: \ntag: {child.tag}, text: {child.text}')
-            # 如果有孙结点
-            if child.getchildren():
-                # 对child进行递归
-                res = traverse_xml(child, payload)
-                # 当前的child将其所有的子节点全都删除
-                val = child.getchildren()
-                for grandson in child.getchildren():
-                    child.remove(grandson)
-                for r in res:
-                    # 每一个r都是以和child相同的标签开头，因此child将r的children复制
-                    for grandson in r.getchildren():
-                        child.append(grandson)
-                    # 复制完后，使用深拷贝将当前的root放入result
-                    result.append(copy.deepcopy(root))
-                    # 随后，child将其所有的子元素删除
-                    for grandson in child.getchildren():
-                        child.remove(grandson)
-                # 还原child
-                for v in val:
-                    child.append(v)
-            # 没有其他子节点了
-            else:
-                # 保存用于还原
-                val = child.text
-                child.text = payload
-                result.append(copy.deepcopy(root))
-                child.text = val
-    return result
+# def traverse_xml(root: lxml.etree._Element, payload: str):
+#     """
+#     遍历xml的每一个结点，步骤如下：
+#     判断当前标签是否含有子节点，
+#     如果有，则在循环中递归调用traverse_xml
+#     如果没有子节点，则将其text设为payload
+#     """
+#     result = []
+#     children = root.getchildren()
+#     """
+#     xml和json算法的区别在于：
+#     xml的大的父标签相当于json中的花括号，没有具体的作用
+#     但是在xml中这是标签，而json中直接遍历了除了花括号以外的key
+#     """
+#     # 如果没有节点了
+#     if not root.getchildren():
+#         # 保存用于还原
+#         val = root.text
+#         root.text = payload
+#         result.append(copy.deepcopy(root))
+#         # 还原
+#         root.text = val
+#     # 有子节点
+#     else:
+#         for child in children:
+#             print(f'当前正在处理: \ntag: {child.tag}, text: {child.text}')
+#             # 如果有孙结点
+#             if child.getchildren():
+#                 # 对child进行递归
+#                 res = traverse_xml(child, payload)
+#                 # 当前的child将其所有的子节点全都删除
+#                 val = child.getchildren()
+#                 for grandson in child.getchildren():
+#                     child.remove(grandson)
+#                 for r in res:
+#                     # 每一个r都是以和child相同的标签开头，因此child将r的children复制
+#                     for grandson in r.getchildren():
+#                         child.append(grandson)
+#                     # 复制完后，使用深拷贝将当前的root放入result
+#                     result.append(copy.deepcopy(root))
+#                     # 随后，child将其所有的子元素删除
+#                     for grandson in child.getchildren():
+#                         child.remove(grandson)
+#                 # 还原child
+#                 for v in val:
+#                     child.append(v)
+#             # 没有其他子节点了
+#             else:
+#                 # 保存用于还原
+#                 val = child.text
+#                 child.text = payload
+#                 result.append(copy.deepcopy(root))
+#                 child.text = val
+#     return result
 
 
 if __name__ == '__main__':
@@ -201,6 +196,7 @@ if __name__ == '__main__':
             </result>
             <url>*FUZZ*</url>
         </run>"""
+    # xml_str = "<run></run>"
     tree: lxml.etree._Element = etree.XML(xml_str)
     p = 'http://127.0.0.1'
     res = traverse_xml(tree, p)
