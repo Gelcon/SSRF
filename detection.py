@@ -27,7 +27,8 @@ class SSRFDetection(object):
         # 生成self.payload
         self.generate_payload()
         # TODO: 先注释掉，测试生成Payload是否有误
-        # self.send_request()
+        # 发送请求
+        self.send_request()
 
     # 将BurpSuite格式的请求转换为字典等信息
     def get_request_info(self, **kwargs):
@@ -157,10 +158,10 @@ class SSRFDetection(object):
                 logging.info(f"当前Payload:\n{str(info)}\n请求成功")
                 # 如果一个类实现了__str__方法
                 # 当我们将类的实例传递给str()方法时，Python会调用__str__方法
-                f.write(f"当前Payload:\n{str(info)}\n请求成功")
+                f.write(f"当前Payload:\n{str(info)}\n请求成功\n\n")
             else:
                 logging.error(f"当前Payload:\n{str(info)}\n请求失败")
-                f.write(f"当前Payload:\n{str(info)}\n请求失败")
+                f.write(f"当前Payload:\n{str(info)}\n请求失败\n\n")
         # 手动关闭
         f.close()
 
@@ -229,7 +230,8 @@ class Payload:
                 # 将body转换为dict类型
                 json_dict = json.loads(info.body)
                 # 生成访问127.0.0.1的payload
-                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                # temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                temp = all_payload(ip='127.0.0.1', port=info.port, site='www.google.com')
                 # 每一个payload，都插入可以作为值的地方
                 for p in temp:
                     # 返回的是字典类型
@@ -245,7 +247,8 @@ class Payload:
                 # 将body转换为XML类型
                 tree = etree.XML(info.body)
                 # 生成访问127.0.0.1的payload
-                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                # temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                temp = all_payload(ip='127.0.0.1', port=info.port, site='www.google.com')
                 # 每一个payload，都插入可以作为值的地方
                 for p in temp:
                     result = traverse_xml(tree, p)
@@ -261,7 +264,8 @@ class Payload:
                 if not param_dict:
                     logging.info(f"{info.path} don't have any param to inject.")
                 # 生成访问127.0.0.1的payload
-                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                # temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                temp = all_payload(ip='127.0.0.1', port=info.port, site='www.google.com')
                 for p in temp:
                     for key in param_dict.keys():
                         # 保存value
@@ -293,8 +297,8 @@ class Payload:
             if not param_dict:
                 logging.info(f"{info.path} don't have any param to inject.")
             # 生成访问127.0.0.1的payload
-            temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
-            print(f"temp[0]: {temp[0]}")
+            # temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+            temp = all_payload(ip='127.0.0.1', port=info.port, site='www.google.com')
             for p in temp:
                 for key in param_dict.keys():
                     # 保存value
@@ -495,22 +499,17 @@ def fetch_response(info: RequestInfo) -> tuple:
 
 
 if __name__ == '__main__':
-    raw_str = """
-POST /index.php HTTP/1.1
-Host: ctf.hacklab-esgi.org:8082
-Content-Length: 5
-Cache-Control: max-age=0
-Origin: http://ctf.hacklab-esgi.org:8082
-Upgrade-Insecure-Requests: 1
-Content-Type: application/x-www-form-urlencoded
-User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36 OPR/60.0.3255.15 (Edition beta)
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8
-Referer: http://ctf.hacklab-esgi.org:8082/
+    raw_str = """POST /ssrf2 HTTP/1.1
+Host: 127.0.0.1:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:62.0) Gecko/20100101 Firefox/62.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
 Accept-Encoding: gzip, deflate
-Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7
-Cookie: session=718ec500-02c9-433e-ac3d-ece753ee1169
+Referer: http://127.0.0.1:5000/
+Content-Type: application/json
+Content-Length: 43
 Connection: close
+Upgrade-Insecure-Requests: 1
 
-url=FUZZME
-"""
+{"userId":"1", "url": "http://example.com"}"""
     SSRFDetection(raw_str)

