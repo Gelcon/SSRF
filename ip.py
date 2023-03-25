@@ -290,7 +290,7 @@ def all_payload(ip, port, site, export='export') -> list:
     if export == '':
         pass
     elif export == 'export':
-        filename = "export_file_" + ip + "_" + str(datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
+        filename = "./result/payload/payload_origin/payload_origin_" + ip + "_" + str(datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
     else:
         logging.error('input export or Nothing, other words are forbidden')
 
@@ -478,6 +478,12 @@ def all_payload(ip, port, site, export='export') -> list:
         print("\n" + '-----------------------------------------------------------------------------------------------')
     print()
     return payload
+
+
+# # 测试使用
+# def all_payload(ip, port, site, export='export') -> list:
+#     res = ['http://127.0.0.1']
+#     return res
 
 
 if __name__ == '__main__':

@@ -26,7 +26,8 @@ class SSRFDetection(object):
         self.get_request_info()
         # 生成self.payload
         self.generate_payload()
-        self.send_request()
+        # TODO: 先注释掉，测试生成Payload是否有误
+        # self.send_request()
 
     # 将BurpSuite格式的请求转换为字典等信息
     def get_request_info(self, **kwargs):
@@ -130,15 +131,23 @@ class SSRFDetection(object):
         logging.info('生成Payload如下：')
         for p in self.payload:
             logging.info(p)
+        filename = "./result/payload/payload_info/request_payload_" + "_" + str(
+            datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
+        # 将当前的Payload写入文件
+        with open(filename, 'w', encoding='utf-8') as f:
+            for p in self.payload:
+                f.write(str(p) + '\n\n')
 
     # 发送请求
     def send_request(self):
         """
         利用requests库发送请求
+        TODO: 改为ChatGPT推荐的写法，详见md文件
         """
         info_list = self.payload
-        filename = "request_log_" + "_" + str(datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
-        f = open(filename, 'w')
+        filename = "./result/request_log/request_log_" + "_" + str(
+            datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
+        f = open(filename, 'w', encoding='utf-8')
         # 并发编程，创建一个具有8个工作线程的线程池
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             # 对info_list中的每一个info都调用fetch_response方法
@@ -154,6 +163,7 @@ class SSRFDetection(object):
                 f.write(f"当前Payload:\n{str(info)}\n请求失败")
         # 手动关闭
         f.close()
+
 
 # 封装各种信息
 class RequestInfo:
@@ -182,13 +192,13 @@ class RequestInfo:
     def __str__(self):
         # http的80或者https的443端口省略不写
         if self.port == 80 or self.port == 443:
-            return "\n以下是RequestInfo的内容：\nheaders:\n{}\nbody:\n{}\nmethod: {}\nURL: {}" \
+            return "以下是RequestInfo的内容：\nheaders:\n{}\nbody:\n{}\nmethod: {}\nURL: {}" \
                 .format(self.headers,
                         self.body,
                         self.method,
                         self.scheme + '://' + self.host + self.path)
         else:
-            return "\n以下是RequestInfo的内容：\nheaders:\n{}\nbody:\n{}\nmethod: {}\nURL: {}" \
+            return "以下是RequestInfo的内容：\nheaders:\n{}\nbody:\n{}\nmethod: {}\nURL: {}" \
                 .format(self.headers,
                         self.body,
                         self.method,
@@ -227,7 +237,8 @@ class Payload:
                     for r in result:
                         # json.dumps(r)将字典转换为json字符串
                         info.body = json.dumps(r)
-                        payload.append(info)
+                        # 此处需要使用深拷贝
+                        payload.append(copy.deepcopy(info))
 
             # XML格式
             elif info.headers['Content-Type'] and "application/xml" in info.headers['Content-Type']:
@@ -241,7 +252,7 @@ class Payload:
                     for r in result:
                         # toString方法将_Element对象转换为str
                         info.body = etree.tostring(r).decode('utf-8')
-                        payload.append(info)
+                        payload.append(copy.deepcopy(info))
 
             # x-www-form-urlencoded，参数格式：key1=value1&key2=value2
             elif info.headers['Content-Type'] and "application/x-www-form-urlencoded" in info.headers['Content-Type']:
@@ -259,7 +270,7 @@ class Payload:
                         # 放入请求体
                         info.body = concat_post_urlencoded_str(param_dict)
                         # 放入payload列表
-                        payload.append(info)
+                        payload.append(copy.deepcopy(info))
                         # 还原value值
                         param_dict[key] = val
             else:
@@ -276,11 +287,14 @@ class Payload:
             """
             # 对请求路径进行分割，得到key为请求参数，val为请求值的字典param_dict
             param_dict = split_get_str(info.path)
+            for k in param_dict.keys():
+                print(f"key: {k}, value: {param_dict[k]}")
             # 如果字典为空
             if not param_dict:
                 logging.info(f"{info.path} don't have any param to inject.")
             # 生成访问127.0.0.1的payload
             temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+            print(f"temp[0]: {temp[0]}")
             for p in temp:
                 for key in param_dict.keys():
                     # 保存value
@@ -309,16 +323,21 @@ def split_get_str(path: str):
     params = path.split('?')[1].split('&')
     result = {}
     for param in params:
-        param = param.split('=')
-        result[param[0]] = params[1]
+        temp = param.split('=')
+        result[temp[0]] = temp[1]
     return result
 
 
 # 合并GET请求路径的参数
 def concat_get_str(param_dict: dict):
     result = '?'
-    for key in param_dict.keys():
-        result += key + '=' + param_dict[key]
+    length = len(param_dict.keys())
+    for index, key in enumerate(param_dict.keys()):
+        # 最后1个不加&
+        if index == length - 1:
+            result += key + '=' + param_dict[key]
+        else:
+            result += key + '=' + param_dict[key] + '&'
     return result
 
 
@@ -476,37 +495,22 @@ def fetch_response(info: RequestInfo) -> tuple:
 
 
 if __name__ == '__main__':
-    raw_str = \
-        """POST /minio/webrpc HTTP/1.1
-        Host: 139.224.49.113:888
-        Content-Length: 74
-        x-amz-date: 20221128T032543Z
-        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36
-        Content-Type: application/json
-        Accept: */*
-        Origin: http://192.168.32.128:9000
-        Referer: http://192.168.32.128:9000/minio/login
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9
-        Connection: close
-        
-        {"id":1,"jsonrpc":"2.0","params":{"token":"test"},"method":"web.LoginSTS"}"""
-    SSRFDetection(raw_str)
-
-"""GET /s?ie=UTF-8&wd=test HTTP/1.1
-Host: www.baidu.com
-Sec-Ch-Ua: " Not A;Brand";v="99", "Chromium";v="104"
-Sec-Ch-Ua-Mobile: ?0
-Sec-Ch-Ua-Platform: "Windows"
+    raw_str = """
+POST /index.php HTTP/1.1
+Host: ctf.hacklab-esgi.org:8082
+Content-Length: 5
+Cache-Control: max-age=0
+Origin: http://ctf.hacklab-esgi.org:8082
 Upgrade-Insecure-Requests: 1
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
-Sec-Fetch-Site: none
-Sec-Fetch-Mode: navigate
-Sec-Fetch-User: ?1
-Sec-Fetch-Dest: document
+Content-Type: application/x-www-form-urlencoded
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36 OPR/60.0.3255.15 (Edition beta)
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8
+Referer: http://ctf.hacklab-esgi.org:8082/
 Accept-Encoding: gzip, deflate
-Accept-Language: zh-CN,zh;q=0.9
+Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7
+Cookie: session=718ec500-02c9-433e-ac3d-ece753ee1169
 Connection: close
 
+url=FUZZME
 """
+    SSRFDetection(raw_str)
