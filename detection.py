@@ -26,7 +26,6 @@ class SSRFDetection(object):
         self.get_request_info()
         # 生成self.payload
         self.generate_payload()
-        # TODO: 先注释掉，测试生成Payload是否有误
         # 发送请求
         self.send_request()
 
@@ -143,7 +142,6 @@ class SSRFDetection(object):
     def send_request(self):
         """
         利用requests库发送请求
-        TODO: 改为ChatGPT推荐的写法，详见md文件
         """
         info_list = self.payload
         filename = "./result/request_log/request_log_" + "_" + str(
@@ -155,12 +153,12 @@ class SSRFDetection(object):
             results = executor.map(fetch_response, info_list)
         for r, info in results:
             if r.status_code == 200:
-                logging.info(f"当前Payload:\n{str(info)}\n请求成功")
+                logging.info(f"当前Payload:\n{str(info)}\n请求成功\n")
                 # 如果一个类实现了__str__方法
                 # 当我们将类的实例传递给str()方法时，Python会调用__str__方法
                 f.write(f"当前Payload:\n{str(info)}\n请求成功\n\n")
             else:
-                logging.error(f"当前Payload:\n{str(info)}\n请求失败")
+                logging.error(f"当前Payload:\n{str(info)}\n请求失败\n")
                 f.write(f"当前Payload:\n{str(info)}\n请求失败\n\n")
         # 手动关闭
         f.close()
@@ -230,8 +228,7 @@ class Payload:
                 # 将body转换为dict类型
                 json_dict = json.loads(info.body)
                 # 生成访问127.0.0.1的payload
-                # temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
-                temp = all_payload(ip='127.0.0.1', port=info.port, site='www.google.com')
+                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
                 # 每一个payload，都插入可以作为值的地方
                 for p in temp:
                     # 返回的是字典类型
@@ -247,8 +244,7 @@ class Payload:
                 # 将body转换为XML类型
                 tree = etree.XML(info.body)
                 # 生成访问127.0.0.1的payload
-                # temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
-                temp = all_payload(ip='127.0.0.1', port=info.port, site='www.google.com')
+                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
                 # 每一个payload，都插入可以作为值的地方
                 for p in temp:
                     result = traverse_xml(tree, p)
@@ -264,8 +260,7 @@ class Payload:
                 if not param_dict:
                     logging.info(f"{info.path} don't have any param to inject.")
                 # 生成访问127.0.0.1的payload
-                # temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
-                temp = all_payload(ip='127.0.0.1', port=info.port, site='www.google.com')
+                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
                 for p in temp:
                     for key in param_dict.keys():
                         # 保存value
@@ -297,8 +292,7 @@ class Payload:
             if not param_dict:
                 logging.info(f"{info.path} don't have any param to inject.")
             # 生成访问127.0.0.1的payload
-            # temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
-            temp = all_payload(ip='127.0.0.1', port=info.port, site='www.google.com')
+            temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
             for p in temp:
                 for key in param_dict.keys():
                     # 保存value
@@ -376,7 +370,6 @@ def traverse_json_dict(str_dict: dict, payload):
     # 里面存放字典
     result = []
     for key in str_dict:
-        print(f'当前正在处理的key: {key}')
         """
         判断当前的str_dict[key]是值还是dict
         ① 如果是值，直接将其修改为payload，放入result
