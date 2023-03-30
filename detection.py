@@ -8,6 +8,8 @@ import copy
 import datetime
 import json
 import logging
+import time
+
 import lxml
 import requests
 import concurrent.futures
@@ -128,9 +130,9 @@ class SSRFDetection(object):
     def generate_payload(self):
         # 生成各种Payloads
         self.payload = Payload(self.request_info).payload()
-        logging.info('生成Payload如下：')
-        for p in self.payload:
-            logging.info(p)
+        # logging.info('生成Payload如下：')
+        # for p in self.payload:
+        #     logging.info(p)
         filename = "./result/payload/payload_info/request_payload_" + "_" + str(
             datetime.datetime.now().strftime('%Y.%m.%d_%H.%M.%S')) + '.txt'
         # 将当前的Payload写入文件
@@ -149,17 +151,26 @@ class SSRFDetection(object):
         f = open(filename, 'w', encoding='utf-8')
         # 并发编程，创建一个具有8个工作线程的线程池
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            # 睡眠0.05s
+            time.sleep(0.05)
             # 对info_list中的每一个info都调用fetch_response方法
             results = executor.map(fetch_response, info_list)
-        for r, info in results:
-            if r.status_code == 200:
-                logging.info(f"当前Payload:\n{str(info)}\n请求成功\n")
-                # 如果一个类实现了__str__方法
-                # 当我们将类的实例传递给str()方法时，Python会调用__str__方法
-                f.write(f"当前Payload:\n{str(info)}\n请求成功\n\n")
+        for r, info, timeout_flag in results:
+            # TODO: 校验模块待完成，仅仅以status_code == 200为标准判断SSRF成功是非常不正确的
+            # 当前请求超时
+            if timeout_flag:
+                logging.error(f"当前Payload:\n{str(info)}\n请求超时\n")
+                f.write(f"当前Payload:\n{str(info)}\n请求超时\n\n")
+            # 未超时
             else:
-                logging.error(f"当前Payload:\n{str(info)}\n请求失败\n")
-                f.write(f"当前Payload:\n{str(info)}\n请求失败\n\n")
+                if r.status_code == 200:
+                    logging.info(f"当前Payload:\n{str(info)}\n请求成功\n")
+                    # 如果一个类实现了__str__方法
+                    # 当我们将类的实例传递给str()方法时，Python会调用__str__方法
+                    f.write(f"当前Payload:\n{str(info)}\n请求成功\n\n")
+                else:
+                    logging.error(f"当前Payload:\n{str(info)}\n请求失败\n")
+                    f.write(f"当前Payload:\n{str(info)}\n请求失败\n\n")
         # 手动关闭
         f.close()
 
@@ -301,7 +312,7 @@ class Payload:
                     # 拼接为path
                     info.path = concat_get_str(param_dict)
                     # 放入payload列表
-                    payload.append(info)
+                    payload.append(copy.deepcopy(info))
                     # 还原value值
                     param_dict[key] = val
         else:
@@ -463,46 +474,112 @@ def fetch_response(info: RequestInfo) -> tuple:
     # 完整的请求路径
     full_path = info.scheme + '://' + info.host + ':' + str(info.port) + info.path
     r = None
+    timeout_flag = False
     if info.method == "GET":
-        r = requests.get(full_path,
-                         headers=info.headers,
-                         timeout=info.timeout,
-                         proxies=info.proxies)
+        try:
+            r = requests.get(full_path,
+                             headers=info.headers,
+                             timeout=info.timeout,
+                             proxies=info.proxies)
+        except requests.exceptions.Timeout:
+            timeout_flag = True
     elif info.method == "POST":
         if info.headers['Content-Type'] and "application/json" in info.headers['Content-Type']:
-            r = requests.post(full_path,
-                              headers=info.headers,
-                              json=info.body,
-                              timeout=info.timeout,
-                              proxies=info.proxies)
+            try:
+                r = requests.post(full_path,
+                                  headers=info.headers,
+                                  # 将字符串转换为json
+                                  json=json.loads(info.body),
+                                  # json=info.body,
+                                  timeout=info.timeout,
+                                  proxies=info.proxies)
+            except requests.exceptions.Timeout:
+                timeout_flag = True
         elif info.headers['Content-Type'] and "application/xml" in info.headers['Content-Type']:
-            r = requests.post(full_path,
-                              headers=info.headers,
-                              data=info.body,
-                              timeout=info.timeout,
-                              proxies=info.proxies)
+            try:
+                r = requests.post(full_path,
+                                  headers=info.headers,
+                                  data=info.body,
+                                  timeout=info.timeout,
+                                  proxies=info.proxies)
+            except requests.exceptions.Timeout:
+                timeout_flag = True
         # "application/x-www-form-urlencoded"
         else:
-            r = requests.post(full_path,
-                              headers=info.headers,
-                              data=info.body,
-                              timeout=info.timeout,
-                              proxies=info.proxies)
-    return r, info
+            try:
+                r = requests.post(full_path,
+                                  headers=info.headers,
+                                  data=info.body,
+                                  timeout=info.timeout,
+                                  proxies=info.proxies)
+            except requests.exceptions.Timeout:
+                timeout_flag = True
+    return r, info, timeout_flag
 
 
 if __name__ == '__main__':
-    raw_str = """POST /ssrf2 HTTP/1.1
+    #     raw_str = """POST /ssrf HTTP/1.1
+    # Host: 127.0.0.1:5000
+    # User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:62.0) Gecko/20100101 Firefox/62.0
+    # Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+    # Accept-Language: en-US,en;q=0.5
+    # Accept-Encoding: gzip, deflate
+    # Referer: http://mysimple.ssrf/
+    # Content-Type: application/x-www-form-urlencoded
+    # Content-Length: 31
+    # Connection: close
+    # Upgrade-Insecure-Requests: 1
+    #
+    # url=https%3A%2F%2Fwww.google.fr"""
+
+    #     raw_str = """POST /ssrf2 HTTP/1.1
+    # Host: 127.0.0.1:5000
+    # User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:62.0) Gecko/20100101 Firefox/62.0
+    # Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+    # Accept-Language: en-US,en;q=0.5
+    # Accept-Encoding: gzip, deflate
+    # Referer: http://127.0.0.1:5000/
+    # Content-Type: application/json
+    # Content-Length: 43
+    # Connection: close
+    # Upgrade-Insecure-Requests: 1
+    #
+    # {"userId":"1", "url": "http://example.com"}"""
+
+    raw_str = """GET /ssrf3?url=SSRF HTTP/1.1
 Host: 127.0.0.1:5000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:62.0) Gecko/20100101 Firefox/62.0
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
 Accept-Language: en-US,en;q=0.5
 Accept-Encoding: gzip, deflate
-Referer: http://127.0.0.1:5000/
-Content-Type: application/json
-Content-Length: 43
+Referer: http://mysimple.ssrf/
 Connection: close
-Upgrade-Insecure-Requests: 1
+Upgrade-Insecure-Requests: 1"""
 
-{"userId":"1", "url": "http://example.com"}"""
+    #     raw_str = """POST /ssrf4 HTTP/1.1
+    # User-Agent: User-agent
+    # Host: 127.0.0.1:5000
+    # Connection: close
+    # Accept-Encoding: gzip, deflate
+    # Content-Type: application/xml
+    # Content-Length: 149
+    #
+    # <run><log encoding="hexBinary">4142430A</log><result>0</result><url>*FUZZ*</url></run>"""
+
+    #     raw_str = """POST /index.php HTTP/1.1
+    # Host: ctf.hacklab-esgi.org:8082
+    # Content-Length: 5
+    # Cache-Control: max-age=0
+    # Origin: http://ctf.hacklab-esgi.org:8082
+    # Upgrade-Insecure-Requests: 1
+    # Content-Type: application/x-www-form-urlencoded
+    # User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36 OPR/60.0.3255.15 (Edition beta)
+    # Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8
+    # Referer: http://ctf.hacklab-esgi.org:8082/
+    # Accept-Encoding: gzip, deflate
+    # Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7
+    # Cookie: session=718ec500-02c9-433e-ac3d-ece753ee1169
+    # Connection: close
+    #
+    # url=FUZZME"""
     SSRFDetection(raw_str)

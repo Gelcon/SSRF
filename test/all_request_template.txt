@@ -35,7 +35,6 @@ Upgrade-Insecure-Requests: 1
 {"userId":"1", "url": "http://example.com"}"""
 
 
-
 # POST Request Template: application/xml
 raw_str = """POST /ssrf4 HTTP/1.1
 User-Agent: User-agent
