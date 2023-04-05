@@ -474,13 +474,18 @@ def all_payload(ip, port, site, export='export') -> list:
             with open(filename, 'wb', encoding='utf8') as f:
                 for p in payload:
                     f.write(p + '\n')
-        print("Results are exported to: " + filename, sep='')
+        print("Results will be exported to: " + filename + '\nPlease Wait for a moment......', sep='')
         print("\n" + '-----------------------------------------------------------------------------------------------')
     print()
     return payload
 
 
 # 测试使用
+# def all_payload(ip, port, site, export='export') -> list:
+#     res = ['http://139.224.49.113']
+#     return res
+
+
 # def all_payload(ip, port, site, export='export') -> list:
 #     # res = ['http://127.0.0.1', 'http://0x7f.0x0.0x0.0x1:80/', 'http://0x7f.0x0.0x0.0x1:80?@www.google.com/',
 #     #        'http://0x7f.0x0.0x0.0x1:80#@www.google.com/', 'http://www.google.com@0x7f.0x0.0x0.0x1:80/',

@@ -152,25 +152,35 @@ class SSRFDetection(object):
         # 并发编程，创建一个具有8个工作线程的线程池
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             # 睡眠0.05s
-            time.sleep(0.05)
             # 对info_list中的每一个info都调用fetch_response方法
             results = executor.map(fetch_response, info_list)
-        for r, info, timeout_flag in results:
-            # TODO: 校验模块待完成，仅仅以status_code == 200为标准判断SSRF成功是非常不正确的
+        for r, info, timeout_flag, encode_flag in results:
+            """
+            检测成功的原理：
+            让待检测的服务器发送请求至提供的服务器的80端口，即Apache2的默认界面
+            根据r.text中是否包含Apache2 Ubuntu Default Page这一段字符串来判断
+            当前位置是否存在能够对外发起网络请求的地方
+            """
             # 当前请求超时
             if timeout_flag:
-                logging.error(f"当前Payload:\n{str(info)}\n请求超时\n")
-                f.write(f"当前Payload:\n{str(info)}\n请求超时\n\n")
-            # 未超时
+                logging.error(f"{str(info)}\n请求超时\n")
+                f.write(f"{str(info)}\n请求超时\n\n")
+            elif encode_flag:
+                logging.error(f"{str(info)}\n请求Unicode编码有误\n")
+                f.write(f"{str(info)}\n请求Unicode编码有误\n\n")
+            # 未超时，也无编码错误
             else:
-                if r.status_code == 200:
-                    logging.info(f"当前Payload:\n{str(info)}\n请求成功\n")
+                print(r.text)
+                # 状态码为200，同时请求打到了测试服务器的80端口，即Apache2的默认界面
+                # 其中包含Apache2 Ubuntu Default Page
+                if r.status_code == 200 and 'Apache2 Ubuntu Default Page' in r.text:
+                    logging.info(f"{str(info)}\n请求成功\n")
                     # 如果一个类实现了__str__方法
                     # 当我们将类的实例传递给str()方法时，Python会调用__str__方法
-                    f.write(f"当前Payload:\n{str(info)}\n请求成功\n\n")
+                    f.write(f"{str(info)}\n请求成功\n\n")
                 else:
-                    logging.error(f"当前Payload:\n{str(info)}\n请求失败\n")
-                    f.write(f"当前Payload:\n{str(info)}\n请求失败\n\n")
+                    logging.error(f"{str(info)}\n请求失败\n")
+                    f.write(f"{str(info)}\n请求失败\n\n")
         # 手动关闭
         f.close()
 
@@ -200,19 +210,15 @@ class RequestInfo:
         self.proxies = proxies
 
     def __str__(self):
-        # http的80或者https的443端口省略不写
-        if self.port == 80 or self.port == 443:
-            return "以下是RequestInfo的内容：\nheaders:\n{}\nbody:\n{}\nmethod: {}\nURL: {}" \
-                .format(self.headers,
-                        self.body,
-                        self.method,
-                        self.scheme + '://' + self.host + self.path)
-        else:
-            return "以下是RequestInfo的内容：\nheaders:\n{}\nbody:\n{}\nmethod: {}\nURL: {}" \
-                .format(self.headers,
-                        self.body,
-                        self.method,
-                        self.scheme + '://' + self.host + ':' + str(self.port) + self.path)
+        text = '##########################Content of RequestInfo:##########################\n'
+        text += self.method + " "
+        text += self.path + " HTTP/1.1\n"
+        for header in self.headers:
+            text += header + ": " + self.headers[header] + "\n"
+
+        text += "\n"
+        text += self.body
+        return text[:-1]
 
 
 class Payload:
@@ -239,7 +245,7 @@ class Payload:
                 # 将body转换为dict类型
                 json_dict = json.loads(info.body)
                 # 生成访问127.0.0.1的payload
-                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                temp = all_payload(ip='139.224.49.113', port='80', site='www.baidu.com')
                 # 每一个payload，都插入可以作为值的地方
                 for p in temp:
                     # 返回的是字典类型
@@ -255,7 +261,7 @@ class Payload:
                 # 将body转换为XML类型
                 tree = etree.XML(info.body)
                 # 生成访问127.0.0.1的payload
-                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                temp = all_payload(ip='139.224.49.113', port='80', site='www.baidu.com')
                 # 每一个payload，都插入可以作为值的地方
                 for p in temp:
                     result = traverse_xml(tree, p)
@@ -271,7 +277,7 @@ class Payload:
                 if not param_dict:
                     logging.info(f"{info.path} don't have any param to inject.")
                 # 生成访问127.0.0.1的payload
-                temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+                temp = all_payload(ip='139.224.49.113', port='80', site='www.baidu.com')
                 for p in temp:
                     for key in param_dict.keys():
                         # 保存value
@@ -303,7 +309,7 @@ class Payload:
             if not param_dict:
                 logging.info(f"{info.path} don't have any param to inject.")
             # 生成访问127.0.0.1的payload
-            temp = all_payload(ip='127.0.0.1', port='80', site='www.google.com')
+            temp = all_payload(ip='139.224.49.113', port='80', site='www.baidu.com')
             for p in temp:
                 for key in param_dict.keys():
                     # 保存value
@@ -475,6 +481,7 @@ def fetch_response(info: RequestInfo) -> tuple:
     full_path = info.scheme + '://' + info.host + ':' + str(info.port) + info.path
     r = None
     timeout_flag = False
+    encode_flag = False
     if info.method == "GET":
         try:
             r = requests.get(full_path,
@@ -514,72 +521,24 @@ def fetch_response(info: RequestInfo) -> tuple:
                                   proxies=info.proxies)
             except requests.exceptions.Timeout:
                 timeout_flag = True
-    return r, info, timeout_flag
+            except UnicodeEncodeError:
+                encode_flag = True
+    return r, info, timeout_flag, encode_flag
 
 
 if __name__ == '__main__':
-    #     raw_str = """POST /ssrf HTTP/1.1
-    # Host: 127.0.0.1:5000
-    # User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:62.0) Gecko/20100101 Firefox/62.0
-    # Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
-    # Accept-Language: en-US,en;q=0.5
-    # Accept-Encoding: gzip, deflate
-    # Referer: http://mysimple.ssrf/
-    # Content-Type: application/x-www-form-urlencoded
-    # Content-Length: 31
-    # Connection: close
-    # Upgrade-Insecure-Requests: 1
-    #
-    # url=https%3A%2F%2Fwww.google.fr"""
-
-    #     raw_str = """POST /ssrf2 HTTP/1.1
-    # Host: 127.0.0.1:5000
-    # User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:62.0) Gecko/20100101 Firefox/62.0
-    # Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
-    # Accept-Language: en-US,en;q=0.5
-    # Accept-Encoding: gzip, deflate
-    # Referer: http://127.0.0.1:5000/
-    # Content-Type: application/json
-    # Content-Length: 43
-    # Connection: close
-    # Upgrade-Insecure-Requests: 1
-    #
-    # {"userId":"1", "url": "http://example.com"}"""
-
-    raw_str = """GET /ssrf3?url=SSRF HTTP/1.1
-Host: 127.0.0.1:5000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:62.0) Gecko/20100101 Firefox/62.0
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
-Accept-Language: en-US,en;q=0.5
+    raw_str = """POST /testhook.php HTTP/1.1
+Host: 192.168.32.128:8001
+Content-Length: 30
+Accept: */*
+X-Requested-With: XMLHttpRequest
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36
+Content-Type: application/x-www-form-urlencoded; charset=UTF-8
+Origin: http://192.168.32.128:8001
+Referer: http://192.168.32.128:8001/
 Accept-Encoding: gzip, deflate
-Referer: http://mysimple.ssrf/
+Accept-Language: zh-CN,zh;q=0.9
 Connection: close
-Upgrade-Insecure-Requests: 1"""
 
-    #     raw_str = """POST /ssrf4 HTTP/1.1
-    # User-Agent: User-agent
-    # Host: 127.0.0.1:5000
-    # Connection: close
-    # Accept-Encoding: gzip, deflate
-    # Content-Type: application/xml
-    # Content-Length: 149
-    #
-    # <run><log encoding="hexBinary">4142430A</log><result>0</result><url>*FUZZ*</url></run>"""
-
-    #     raw_str = """POST /index.php HTTP/1.1
-    # Host: ctf.hacklab-esgi.org:8082
-    # Content-Length: 5
-    # Cache-Control: max-age=0
-    # Origin: http://ctf.hacklab-esgi.org:8082
-    # Upgrade-Insecure-Requests: 1
-    # Content-Type: application/x-www-form-urlencoded
-    # User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36 OPR/60.0.3255.15 (Edition beta)
-    # Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8
-    # Referer: http://ctf.hacklab-esgi.org:8082/
-    # Accept-Encoding: gzip, deflate
-    # Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7
-    # Cookie: session=718ec500-02c9-433e-ac3d-ece753ee1169
-    # Connection: close
-    #
-    # url=FUZZME"""
+handler=http%3A%2F%2Flocalhost"""
     SSRFDetection(raw_str)

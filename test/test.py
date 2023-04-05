@@ -1,6 +1,8 @@
 # @Author: Gelcon.
 # @Date: 2023/2/16 14:39
 import copy
+import logging
+import socket
 import string
 from random import *
 import json
@@ -15,6 +17,7 @@ import json
 
 # 在所有字母、所有数字、
 import lxml.etree
+import requests
 
 
 def RANDOM_TEXT_SPEC():
@@ -128,7 +131,6 @@ def colored_print():
 
 from lxml import etree
 
-
 # def traverse_xml(root: lxml.etree._Element, payload: str):
 #     """
 #     遍历xml的每一个结点，步骤如下：
@@ -185,21 +187,33 @@ from lxml import etree
 #     return result
 
 
-if __name__ == '__main__':
-    # xml_str = """<run><log encoding="hexBinary">4142430A</log><result><log>4142430B</log><log>4142430C</log></result><url>*FUZZ*</url></run>"""
-    xml_str = \
-        """<run>
-            <log encoding="hexBinary">4142430A</log>
-            <result>
-                <log>4142430B</log>
-                <log>4142430C</log>
-            </result>
-            <url>*FUZZ*</url>
-        </run>"""
-    # xml_str = "<run></run>"
-    tree: lxml.etree._Element = etree.XML(xml_str)
-    p = 'http://127.0.0.1'
-    res = traverse_xml(tree, p)
-    with open('test.txt', 'w') as f:
-        for r in res:
-            f.write(etree.tostring(r, method='xml').decode('utf-8') + '\n\n')
+# if __name__ == '__main__':
+#     # xml_str = """<run><log encoding="hexBinary">4142430A</log><result><log>4142430B</log><log>4142430C</log></result><url>*FUZZ*</url></run>"""
+#     xml_str = \
+#         """<run>
+#             <log encoding="hexBinary">4142430A</log>
+#             <result>
+#                 <log>4142430B</log>
+#                 <log>4142430C</log>
+#             </result>
+#             <url>*FUZZ*</url>
+#         </run>"""
+#     # xml_str = "<run></run>"
+#     tree: lxml.etree._Element = etree.XML(xml_str)
+#     p = 'http://127.0.0.1'
+#     res = traverse_xml(tree, p)
+#     with open('test.txt', 'w') as f:
+#         for r in res:
+#             f.write(etree.tostring(r, method='xml').decode('utf-8') + '\n\n')
+
+
+# try:
+#     s = socket.socket()
+#     s.bind(('192.168.32.128', 888))
+# except:
+#     logging.info(' * already has an instance, so exit.')
+#     exit(0)
+
+url = 'http://www.baidu.com'
+r = requests.get(url)
+print(type(r.text))
